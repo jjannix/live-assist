@@ -25,7 +25,7 @@
 
     <h2>OBS Scenes</h2>
     <button id="szene2Button">Switch to Szene 2</button>
-    <button id="spotiQButton">Switch to SpotiQ</button>
+    <button id="spotiQButton">Switch to Ard</button>
     <button id="szene3Button">Switch to Szene 3</button>
 
     <h2>Voicemeeter Inputs</h2>
@@ -45,7 +45,7 @@
         });
 
         document.getElementById('spotiQButton').addEventListener('click', () => {
-            socket.emit('transition', { sceneName: 'SpotiQ' });
+            socket.emit('transition', { sceneName: 'Ard' });
         });
 
         document.getElementById('szene3Button').addEventListener('click', () => {
