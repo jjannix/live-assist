@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
+const voicemeeter = require('voicemeeter-remote');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,7 +30,19 @@ async function connectOBSWebSocket() {
     }
 }
 
+async function connectVoicemeeter() {
+    try {
+        await voicemeeter.init();
+        await voicemeeter.login();
+        await voicemeeter.updateDeviceList();
+        console.log('Connected to Voicemeeter');
+    } catch (err) {
+        console.error('Failed to connect to Voicemeeter:', err);
+    }
+}
+
 connectOBSWebSocket();
+connectVoicemeeter();
 
 app.use(express.static('public'));
 
@@ -66,11 +79,11 @@ io.on('connection', socket => {
     socket.on('setVolume', async data => {
         try {
             const volume = parseFloat(data.volume);
-            const dbVolume = 20 * Math.log10(volume); // Convert linear volume to dB
-            await obs.call('SetInputVolume', { inputName: data.inputName, inputVolumeDb: dbVolume });
-            console.log('Set volume for source:', data.inputName, 'to', dbVolume, 'dB');
+            // Set the volume for Voicemeeter virtual inputs
+            await voicemeeter.setStripGain(data.stripIndex, volume);
+            console.log('Set volume for virtual input:', data.stripIndex, 'to', volume, 'dB');
         } catch (err) {
-            console.error('Failed to set volume for source:', err);
+            console.error('Failed to set volume for virtual input:', err);
         }
     });
 

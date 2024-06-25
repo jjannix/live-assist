@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OBS WebSocket Control</title>
+    <title>Voicemeeter Control</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body {
@@ -21,25 +21,21 @@
     </style>
 </head>
 <body>
-    <h1>OBS Studio Control</h1>
+    <h1>Voicemeeter and OBS Control</h1>
+
+    <h2>OBS Scenes</h2>
     <button id="szene2Button">Switch to Szene 2</button>
     <button id="spotiQButton">Switch to SpotiQ</button>
     <button id="szene3Button">Switch to Szene 3</button>
 
-    <h2>Audio Controls</h2>
-    <div>
-        <h3>Desktop Audio</h3>
-        <button onclick="mute('Desktop-Audio')">Mute</button>
-        <button onclick="unmute('Desktop-Audio')">Unmute</button>
-        <input type="range" min="0" max="1" step="0.01" value="1" oninput="setVolume('Desktop-Audio', this.value)">
-    </div>
+    <h2>Voicemeeter Inputs</h2>
+    <h3>Main Input (Voicemeeter VAIO)</h3>
+    <button ondblclick="setVolume(3, 0)">Set to 0 dB</button>
+    <input type="range" min="-60" max="12" step="0.1" value="0" ondblclick="setVolume(3, 0)" oninput="setVolume(3, this.value)">
 
-    <div>
-        <h3>Microphone Audio</h3>
-        <button onclick="mute('Mikrofon-/AUX-Audio')">Mute</button>
-        <button onclick="unmute('Mikrofon-/AUX-Audio')">Unmute</button>
-        <input type="range" min="0" max="1" step="0.01" value="1" oninput="setVolume('Mikrofon-/AUX-Audio', this.value)">
-    </div>
+    <h3>Spotify Input (Voicemeeter AUX)</h3>
+    <button ondblclick="setVolume(0, 0)">Set to 0 dB</button>
+    <input type="range" min="-60" max="12" step="0.1" value="0" ondblclick="setVolume(4, 0)" oninput="setVolume(4, this.value)">
 
     <script>
         const socket = io();
@@ -56,16 +52,8 @@
             socket.emit('transition', { sceneName: 'Szene 3' });
         });
 
-        function mute(inputName) {
-            socket.emit('mute', { inputName });
-        }
-
-        function unmute(inputName) {
-            socket.emit('unmute', { inputName });
-        }
-
-        function setVolume(inputName, volume) {
-            socket.emit('setVolume', { inputName, volume: parseFloat(volume) });
+        function setVolume(stripIndex, volume) {
+            socket.emit('setVolume', { stripIndex, volume });
         }
     </script>
 </body>
