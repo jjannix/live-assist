@@ -13,7 +13,7 @@ async function connectOBSWebSocket() {
     try {
         await obs.connect('ws://192.168.2.93:4444', 'B5CGTGKhOfNaC534');
         console.log('Connected to OBS WebSocket');
-        
+
         const { scenes } = await obs.call('GetSceneList');
         console.log('Available scenes:');
         scenes.forEach(scene => {
@@ -25,6 +25,10 @@ async function connectOBSWebSocket() {
         sources.inputs.forEach(source => {
             console.log(source.inputName);
         });
+
+        // Emit the current scene to clients
+        const currentScene = await obs.call('GetCurrentProgramScene');
+        io.emit('currentScene', { sceneName: currentScene.currentProgramSceneName });
     } catch (err) {
         console.error('Failed to connect to OBS WebSocket:', err);
     }
@@ -48,13 +52,18 @@ app.use(express.static('public'));
 
 io.on('connection', socket => {
     console.log('Client connected');
+    io.emit('terminalOutput', 'Client connected');
 
     socket.on('transition', async data => {
         try {
             await obs.call('SetCurrentProgramScene', { 'sceneName': data.sceneName });
             console.log('Transitioned to scene:', data.sceneName);
+            io.emit('terminalOutput', 'Transitioned to scene: ' + data.sceneName);
+
+            io.emit('currentScene', { sceneName: data.sceneName });
         } catch (err) {
             console.error('Failed to transition:', err);
+            io.emit('terminalOutput', 'Failed to transition: ' + err.message);
         }
     });
 
@@ -62,8 +71,10 @@ io.on('connection', socket => {
         try {
             await obs.call('SetInputMute', { inputName: data.inputName, inputMuted: true });
             console.log('Muted source:', data.inputName);
+            io.emit('terminalOutput', 'Muted source: ' + data.inputName);
         } catch (err) {
             console.error('Failed to mute source:', err);
+            io.emit('terminalOutput', 'Failed to mute source: ' + err.message);
         }
     });
 
@@ -71,27 +82,31 @@ io.on('connection', socket => {
         try {
             await obs.call('SetInputMute', { inputName: data.inputName, inputMuted: false });
             console.log('Unmuted source:', data.inputName);
+            io.emit('terminalOutput', 'Unmuted source: ' + data.inputName);
         } catch (err) {
             console.error('Failed to unmute source:', err);
+            io.emit('terminalOutput', 'Failed to unmute source: ' + err.message);
         }
     });
 
     socket.on('setVolume', async data => {
         try {
             const volume = parseFloat(data.volume);
-            // Set the volume for Voicemeeter virtual inputs
             await voicemeeter.setStripGain(data.stripIndex, volume);
             console.log('Set volume for virtual input:', data.stripIndex, 'to', volume, 'dB');
+            io.emit('terminalOutput', 'Set volume for virtual input: ' + data.stripIndex + ' to ' + volume + ' dB');
         } catch (err) {
             console.error('Failed to set volume for virtual input:', err);
+            io.emit('terminalOutput', 'Failed to set volume for virtual input: ' + err.message);
         }
     });
-
     socket.on('disconnect', () => {
         console.log('Client disconnected');
+        io.emit('terminalOutput', 'Client disconnected');
     });
 });
 
 server.listen(3000, () => {
     console.log('Server is running on port 3000');
+    io.emit('terminalOutput', 'Server is running on port 3000');
 });
