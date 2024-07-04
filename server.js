@@ -101,26 +101,84 @@ io.on('connection', socket => {
         }
     });
 
-    socket.on('automatedAction', async () => {
+    socket.on('GameAction', async () => {
         try {
-            // Switch to OBS Scene "ARD"
-            await obs.call('SetCurrentProgramScene', { sceneName: 'Ard' });
-            io.emit('terminalOutput', 'Switched to scene: ARD');
-
-            // Set Spotify Input to -40 dB
-            await voicemeeter.setStripGain(4, -40);
-            io.emit('terminalOutput', 'Set Spotify Input to -40 dB');
-
-            // Set Main Input to 0 dB
-            await voicemeeter.setStripGain(3, 0);
-            io.emit('terminalOutput', 'Set Main Input to 0 dB');
-
+            const fadeSteps = 100; // Number of steps for fading (adjust for smoothness)
+            const stepDuration = 1 / fadeSteps;
+    
+            // Step 1: Fade out Spotify Input (Strip 4)
+            io.emit('terminalOutput', 'Starting to fade out Spotify Input.');
+            for (let i = 0; i <= fadeSteps; i++) {
+                const progress = i / fadeSteps;
+                const spotifyInputGain = Math.round(-60 * progress);
+                await voicemeeter.setStripGain(4, spotifyInputGain);
+                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            }
+            io.emit('terminalOutput', 'Spotify Input faded out.');
+    
+            // Step 2: Fade in Main Input for OBS transition sound (Strip 3)
+            io.emit('terminalOutput', 'Fading in Main Input for OBS transition.');
+            for (let i = 0; i <= fadeSteps; i++) {
+                const progress = i / fadeSteps;
+                const mainInputGain = Math.round(-60 * (1 - progress));
+                await voicemeeter.setStripGain(3, mainInputGain);
+                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            }
+    
+            // Step 3: Switch to OBS Scene "Szene 2"
+            await obs.call('SetCurrentProgramScene', { sceneName: 'Szene 2' });
+            io.emit('terminalOutput', 'Switched to scene: Szene 2');
+    
+            // Step 4: Wait for OBS transition to complete
+            await new Promise(resolve => setTimeout(resolve, 5000));
+    
             io.emit('terminalOutput', 'Automated action completed successfully.');
         } catch (err) {
             console.error('Automated action failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
         }
     });
+
+    socket.on('PauseAction', async () => {
+        try {
+            // Switch to OBS Scene "Szene 2"
+            await obs.call('SetCurrentProgramScene', { sceneName: 'Szene 2' });
+            io.emit('terminalOutput', 'Switched to scene: Szene 2');
+    
+            // Emit terminal output indicating OBS scene switch initiation
+            io.emit('terminalOutput', 'Initiating OBS scene switch.');
+    
+            // Wait for 5 seconds to ensure the OBS transition completes
+            await new Promise(resolve => setTimeout(resolve, 5500));
+    
+            // Start fading out Main Input and fading in Spotify Input simultaneously
+            const fadeSteps = 100; // Number of steps for fading (adjust for smoothness)
+            const stepDuration = 1 / fadeSteps; // Total duration divided by steps
+    
+            for (let i = 0; i <= fadeSteps; i++) {
+                const progress = i / fadeSteps;
+                const mainInputGain = Math.round(-60 * progress);
+                const spotifyInputGain = Math.round(-60 * (1 - progress));
+    
+                await Promise.all([
+                    voicemeeter.setStripGain(3, mainInputGain),
+                    voicemeeter.setStripGain(4, spotifyInputGain)
+                ]);
+    
+                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            }
+    
+            io.emit('terminalOutput', 'Faded out Main Input and faded in Spotify Input.');
+            io.emit('terminalOutput', 'Automated action completed successfully.');
+        } catch (err) {
+            console.error('Automated action failed:', err);
+            io.emit('terminalOutput', 'Automated action failed: ' + err.message);
+        }
+    });
+    
+    
+    
+    
 
     socket.on('disconnect', () => {
         console.log('Client disconnected');

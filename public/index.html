@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voicemeeter and OBS Control</title>
+    <title>Jnk Euros Studio</title>
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -34,7 +34,8 @@
 
         <div class="container">
             <h2>Automated Action</h2>
-            <button id="automatedActionButton">Execute Automated Action</button>
+            <button id="PauseActionButton">Pause</button>
+            <button id="GameActionButton">Zum Spiel</button>
         </div>
 
         <div class="container">
@@ -79,12 +80,21 @@
         }
 
         // Automated Action
-        document.getElementById('automatedActionButton').addEventListener('click', () => {
-            socket.emit('automatedAction', {
-                actionName: 'exampleAction',
+        document.getElementById('PauseActionButton').addEventListener('click', () => {
+            socket.emit('PauseAction', {
+                actionName: 'PauseAction',
+                obsScene: 'Szene 2',
+                spotifyVolume: 0,
+                mainVolume: -60
+            });
+        });
+
+        document.getElementById('GameActionButton').addEventListener('click', () => {
+            socket.emit('GameAction', {
+                actionName: 'GameAction',
                 obsScene: 'Ard',
-                spotifyVolume: -40,
-                mainVolume: 0
+                spotifyVolume: 0,
+                mainVolume: -60
             });
         });
 
