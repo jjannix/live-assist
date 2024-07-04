@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,39 +7,49 @@
     <script src="/socket.io/socket.io.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-    <h1>EURO 2024 Studio</h1>
+    <header>
+        <h1>Euros Studio</h1>
+    </header>
+    
+    <main>
+        <div class="container">
+            <h2>OBS Scenes</h2>
+            <button id="szene2Button">Switch to Szene 2</button>
+            <button id="spotiQButton">Switch to Ard</button>
+            <button id="szene3Button">Switch to Szene 3</button>
+            <h3>Current Scene: <span id="currentScene">Loading...</span></h3>
+        </div>
 
-    <div class="container">
-        <h2>OBS Scenes</h2>
-        <button id="szene2Button">Switch to Szene 2</button>
-        <button id="spotiQButton">Switch to Ard</button>
-        <button id="ScreenrecButton">Switch to Screenrec</button>
-        <h3>Current Scene: <span id="currentScene">Loading...</span></h3>
-    </div>
+        <div class="container">
+            <h2>Voicemeeter Inputs</h2>
+            <h3>Main Input (Voicemeeter VAIO)</h3>
+            <button ondblclick="setVolume(3, 0); resetSlider('mainInputSlider', 0)">Set to 0 dB</button>
+            <input id="mainInputSlider" type="range" min="-60" max="12" step="0.1" value="0" ondblclick="setVolume(3, 0); resetSlider('mainInputSlider', 0)" oninput="updateVolume(3, this.value)">
+        
+            <h3>Spotify Input (Voicemeeter AUX)</h3>
+            <button ondblclick="setVolume(4, 0); resetSlider('spotifyInputSlider', 0)">Set to 0 dB</button>
+            <input id="spotifyInputSlider" type="range" min="-60" max="12" step="0.1" value="0" ondblclick="setVolume(4, 0); resetSlider('spotifyInputSlider', 0)" oninput="updateVolume(4, this.value)">
+        </div>
 
-    <div class="container">
-        <h2>Voicemeeter Inputs</h2>
-        <h3>Main Input (Voicemeeter VAIO)</h3>
-        <button ondblclick="setVolume(3, 0); resetSlider('mainInputSlider', 0)">Set to 0 dB</button>
-        <input id="mainInputSlider" type="range" min="-60" max="12" step="0.1" value="0"
-            ondblclick="setVolume(3, 0); resetSlider('mainInputSlider', 0)" oninput="updateVolume(3, this.value)">
+        <div class="container">
+            <h2>Automated Action</h2>
+            <button id="automatedActionButton">Execute Automated Action</button>
+        </div>
 
-        <h3>Spotify Input (Voicemeeter AUX)</h3>
-        <button ondblclick="setVolume(4, 0); resetSlider('spotifyInputSlider', 0)">Set to 0 dB</button>
-        <input id="spotifyInputSlider" type="range" min="-60" max="12" step="0.1" value="0"
-            ondblclick="setVolume(4, 0); resetSlider('spotifyInputSlider', 0)" oninput="updateVolume(4, this.value)">
-    </div>
+        <div class="container">
+            <h2>Terminal Output</h2>
+            <div id="terminalOutput" class="output-box"></div>
+        </div>
 
-    <div class="container">
-        <h2>Terminal Output</h2>
-        <div id="terminalOutput" class="output-box"></div>
-    </div>
+        <div class="container">
+            <button id="darkModeToggle">Toggle Dark Mode</button>
+        </div>
+    </main>
 
-    <div class="container">
-        <button id="darkModeToggle">Toggle Dark Mode</button>
-    </div>
+    <footer>
+        <p>&copy; 2024 Jannik. All rights reserved.</p>
+    </footer>
 
     <script>
         const socket = io();
@@ -53,8 +62,8 @@
             socket.emit('transition', { sceneName: 'Ard' });
         });
 
-        document.getElementById('ScreenrecButton').addEventListener('click', () => {
-            socket.emit('transition', { sceneName: 'Screenrec' });
+        document.getElementById('szene3Button').addEventListener('click', () => {
+            socket.emit('transition', { sceneName: 'Szene 3' });
         });
 
         function setVolume(stripIndex, volume) {
@@ -68,6 +77,16 @@
         function resetSlider(sliderId, value) {
             document.getElementById(sliderId).value = value;
         }
+
+        // Automated Action
+        document.getElementById('automatedActionButton').addEventListener('click', () => {
+            socket.emit('automatedAction', {
+                actionName: 'exampleAction',
+                obsScene: 'Ard',
+                spotifyVolume: -40,
+                mainVolume: 0
+            });
+        });
 
         // Listen for terminal output
         socket.on('terminalOutput', data => {
@@ -87,5 +106,4 @@
         });
     </script>
 </body>
-
 </html>

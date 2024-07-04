@@ -100,6 +100,28 @@ io.on('connection', socket => {
             io.emit('terminalOutput', 'Failed to set volume for virtual input: ' + err.message);
         }
     });
+
+    socket.on('automatedAction', async () => {
+        try {
+            // Switch to OBS Scene "ARD"
+            await obs.call('SetCurrentProgramScene', { sceneName: 'Ard' });
+            io.emit('terminalOutput', 'Switched to scene: ARD');
+
+            // Set Spotify Input to -40 dB
+            await voicemeeter.setStripGain(4, -40);
+            io.emit('terminalOutput', 'Set Spotify Input to -40 dB');
+
+            // Set Main Input to 0 dB
+            await voicemeeter.setStripGain(3, 0);
+            io.emit('terminalOutput', 'Set Main Input to 0 dB');
+
+            io.emit('terminalOutput', 'Automated action completed successfully.');
+        } catch (err) {
+            console.error('Automated action failed:', err);
+            io.emit('terminalOutput', 'Automated action failed: ' + err.message);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected');
         io.emit('terminalOutput', 'Client disconnected');
