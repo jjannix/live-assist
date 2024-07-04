@@ -8,7 +8,7 @@ git pull origin main
 
 :: Start Voicemeeter
 echo Starting Voicemeeter...
-start "" "C:\Program Files (x86)\VB\Voicemeeter\Voicemeeter.exe"
+start "" "C:\Program Files (x86)\VB\Voicemeeter\Voicemeeterpro.exe"
 
 :: Wait for a few seconds to ensure Voicemeeter starts properly
 timeout /t 5 /nobreak >nul
@@ -21,7 +21,7 @@ if exist "C:\Program Files\obs-studio\bin\64bit\obs64.exe" (
     :: Check for localization files
     if exist "C:\Program Files\obs-studio\data\obs-studio\locale\en-US.ini" (
         echo Starting OBS Studio...
-        start "" "cmd.exe" /c "cd /d C:\Program Files\obs-studio\bin\64bit && obs64.exe"
+        start "" /b "cmd.exe" /c "cd /d C:\Program Files\obs-studio\bin\64bit && obs64.exe"
     ) else (
         echo ERROR: OBS Studio localization files not found.
         pause
@@ -38,7 +38,7 @@ timeout /t 5 /nobreak >nul
 
 :: Start the Node.js server
 echo Starting Node.js server...
-start "" "cmd.exe" /k "node server.js"
+start "" /b "cmd.exe" /c "node server.js"
 
 :: Wait for a few seconds to ensure the server starts properly
 timeout /t 5 /nobreak >nul
