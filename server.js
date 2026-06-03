@@ -3,15 +3,18 @@ const http = require('http');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const voicemeeter = require('voicemeeter-remote');
+const dotenv = require('dotenv');
 
+dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const obs = new OBSWebSocket();
 
+
 async function connectOBSWebSocket() {
     try {
-        await obs.connect('ws://192.168.2.93:4444', 'B5CGTGKhOfNaC534');
+        await obs.connect(process.env.OBS_WEBSOCKET_URL, process.env.OBS_WEBSOCKET_PASSWORD);
         console.log('Connected to OBS WebSocket');
 
         const { scenes } = await obs.call('GetSceneList');
