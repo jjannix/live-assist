@@ -289,6 +289,16 @@
             btn.classList.toggle('muted', d.muted);
         });
 
+        // ── Fader state sync (from Voicemeeter on connect)
+        socket.on('faderState', d => {
+            const faderId = d.stripIndex === 3 ? 'tvFader' : 'spFader';
+            const dbId = d.stripIndex === 3 ? 'tvDb' : 'spDb';
+            const el = $(`#${faderId}`);
+            el.value = d.gain;
+            updDb(dbId, d.gain);
+            updFill(faderId);
+        });
+
         // ── Fader presets (cycle on double-tap)
         const faderPresets = {
             tvFader: [-1.2, -3, -6, -10, 0],

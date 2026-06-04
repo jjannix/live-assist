@@ -104,6 +104,16 @@ async function connectVoicemeeter() {
         } catch(e) {
             console.error('Failed to read initial mute state:', e.message || e);
         }
+
+        // Read initial fader levels from Voicemeeter
+        try {
+            const tvGain = voicemeeter.getStripGain(3);
+            const spGain = voicemeeter.getStripGain(4);
+            io.emit('faderState', { stripIndex: 3, gain: tvGain });
+            io.emit('faderState', { stripIndex: 4, gain: spGain });
+        } catch(e) {
+            console.error('Failed to read initial fader levels:', e.message || e);
+        }
     } catch (err) {
         vmConnected = false;
         console.error('Failed to connect to Voicemeeter:', err && err.message ? err.message : err);
@@ -140,6 +150,10 @@ io.on('connection', async socket => {
     if (vmConnected) {
         socket.emit('muteState', { stripIndex: 3, muted: muteState[3] });
         socket.emit('muteState', { stripIndex: 4, muted: muteState[4] });
+        try {
+            socket.emit('faderState', { stripIndex: 3, gain: voicemeeter.getStripGain(3) });
+            socket.emit('faderState', { stripIndex: 4, gain: voicemeeter.getStripGain(4) });
+        } catch(e) {}
     }
 
     socket.on('transition', async data => {
