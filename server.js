@@ -114,9 +114,15 @@ if (voicemeeter) {
     setInterval(() => {
         if (!vmConnected) return;
         try {
-            const tvLevel = voicemeeter.getLevel(0, 3);  // Strip 3, channel 0 (post-fader)
-            const spLevel = voicemeeter.getLevel(0, 7);  // Strip 4, channel 0 (offset by strips)
-            io.emit('vu', { tv: tvLevel || -60, sp: spLevel || -60 });
+            // Channel indices: Strip N = channels N*2 (left) and N*2+1 (right)
+            const tvL = voicemeeter.getLevel(1, 6);   // postFaderInput, Strip 3 left
+            const tvR = voicemeeter.getLevel(1, 7);   // Strip 3 right
+            const spL = voicemeeter.getLevel(1, 8);   // Strip 4 left
+            const spR = voicemeeter.getLevel(1, 9);   // Strip 4 right
+            io.emit('vu', {
+                tv: Math.max(tvL || -60, tvR || -60),
+                sp: Math.max(spL || -60, spR || -60)
+            });
         } catch(e) {}
     }, 50);
 }
@@ -191,7 +197,7 @@ io.on('connection', async socket => {
         try {
             const strip = data.stripIndex;
             const current = voicemeeter.getStripMute(strip);
-            const muted = current === 1;
+            const muted = current !== 0;  // Voicemeeter returns float, 0 = unmuted, anything else = muted
             voicemeeter.setStripMute(strip, !muted);
             const label = strip === 3 ? 'TV' : 'Spotify';
             io.emit('muteState', { stripIndex: strip, muted: !muted });
