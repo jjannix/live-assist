@@ -13,13 +13,83 @@ const server = http.createServer(app);
 const io = socketIo(server);
 const obs = new OBSWebSocket();
 
+// ── Auto-reconnect state & helpers
+const RECONNECT_INITIAL_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+const VM_HEALTH_CHECK_MS = 30000;
+
+let shuttingDown = false;
+let obsReconnectAttempt = 0;
+let obsReconnectTimer = null;
+let vmReconnectAttempt = 0;
+let vmReconnectTimer = null;
+let vmHealthCheckTimer = null;
+
+function reconnectDelay(attempt) {
+    return Math.min(RECONNECT_INITIAL_MS * Math.pow(2, attempt), RECONNECT_MAX_MS);
+}
+
+function setObsStatus(connected, detail = '') {
+    io.emit('obsStatus', { connected });
+    if (detail) io.emit('terminalOutput', detail);
+}
+
+function setVmStatus(connected, detail = '') {
+    io.emit('vmStatus', { connected });
+    if (detail) io.emit('terminalOutput', detail);
+}
+
+function scheduleOBSReconnect() {
+    if (shuttingDown || obsReconnectTimer) return;
+    const delay = reconnectDelay(obsReconnectAttempt);
+    obsReconnectAttempt++;
+    io.emit('terminalOutput', `OBS: reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${obsReconnectAttempt})…`);
+    obsReconnectTimer = setTimeout(() => {
+        obsReconnectTimer = null;
+        connectOBSWebSocket();
+    }, delay);
+}
+
+function scheduleVMReconnect() {
+    if (shuttingDown || vmReconnectTimer || !voicemeeter) return;
+    const delay = reconnectDelay(vmReconnectAttempt);
+    vmReconnectAttempt++;
+    io.emit('terminalOutput', `Voicemeeter: reconnecting in ${(delay / 1000).toFixed(1)}s (attempt ${vmReconnectAttempt})…`);
+    vmReconnectTimer = setTimeout(async () => {
+        vmReconnectTimer = null;
+        await connectVoicemeeter();
+    }, delay);
+}
+
+function startVMHealthCheck() {
+    if (vmHealthCheckTimer || !voicemeeter) return;
+    vmHealthCheckTimer = setInterval(() => {
+        if (!vmConnected) return;
+        try {
+            voicemeeter.getStripGain(3);
+        } catch (err) {
+            console.error('VM health check failed:', err && err.message ? err.message : err);
+            vmConnected = false;
+            stopVMHealthCheck();
+            setVmStatus(false, 'Voicemeeter connection lost');
+            scheduleVMReconnect();
+        }
+    }, VM_HEALTH_CHECK_MS);
+}
+
+function stopVMHealthCheck() {
+    if (vmHealthCheckTimer) {
+        clearInterval(vmHealthCheckTimer);
+        vmHealthCheckTimer = null;
+    }
+}
 
 async function connectOBSWebSocket() {
     try {
         await obs.connect(process.env.OBS_WEBSOCKET_URL, process.env.OBS_WEBSOCKET_PASSWORD);
+        obsReconnectAttempt = 0;
         console.log('Connected to OBS WebSocket');
-        io.emit('obsStatus', { connected: true });
-        io.emit('terminalOutput', 'Connected to OBS WebSocket');
+        setObsStatus(true, 'Connected to OBS WebSocket');
 
         const { scenes } = await obs.call('GetSceneList');
         console.log('Available scenes:');
@@ -38,8 +108,8 @@ async function connectOBSWebSocket() {
         io.emit('currentScene', { sceneName: currentScene.currentProgramSceneName });
     } catch (err) {
         console.error('Failed to connect to OBS WebSocket:', err);
-        io.emit('obsStatus', { connected: false });
-        io.emit('terminalOutput', 'Failed to connect to OBS WebSocket: ' + err.message);
+        setObsStatus(false, 'Failed to connect to OBS WebSocket: ' + (err && err.message ? err.message : err));
+        scheduleOBSReconnect();
     }
 }
 
@@ -65,13 +135,14 @@ obs.on('CurrentProgramSceneChanged', data => {
 
 obs.on('ConnectionClosed', () => {
     console.error('OBS WebSocket disconnected');
-    io.emit('obsStatus', { connected: false });
-    io.emit('terminalOutput', 'OBS WebSocket disconnected');
+    setObsStatus(false, 'OBS WebSocket disconnected');
+    scheduleOBSReconnect();
 });
 
 obs.on('ConnectionError', err => {
     console.error('OBS WebSocket error:', err);
-    io.emit('obsStatus', { connected: false });
+    setObsStatus(false, 'OBS WebSocket error: ' + (err && err.message ? err.message : err));
+    scheduleOBSReconnect();
 });
 
 let vmConnected = false;
@@ -89,9 +160,10 @@ async function connectVoicemeeter() {
         await voicemeeter.login();
         await voicemeeter.updateDeviceList();
         vmConnected = true;
+        vmReconnectAttempt = 0;
         console.log('Connected to Voicemeeter');
-        io.emit('vmStatus', { connected: true });
-        io.emit('terminalOutput', 'Connected to Voicemeeter');
+        setVmStatus(true, 'Connected to Voicemeeter');
+        startVMHealthCheck();
 
         // Read initial mute state from Voicemeeter
         try {
@@ -116,9 +188,10 @@ async function connectVoicemeeter() {
         }
     } catch (err) {
         vmConnected = false;
+        stopVMHealthCheck();
         console.error('Failed to connect to Voicemeeter:', err && err.message ? err.message : err);
-        io.emit('vmStatus', { connected: false });
-        io.emit('terminalOutput', 'Voicemeeter not available — audio controls disabled');
+        setVmStatus(false, 'Voicemeeter not available — audio controls disabled');
+        scheduleVMReconnect();
     }
 }
 
@@ -353,6 +426,22 @@ io.on('connection', async socket => {
         io.emit('terminalOutput', 'Client disconnected');
     });
 });
+
+// ── Graceful shutdown — prevent reconnection when process is exiting
+function shutdown() {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    stopVMHealthCheck();
+    if (obsReconnectTimer) { clearTimeout(obsReconnectTimer); obsReconnectTimer = null; }
+    if (vmReconnectTimer) { clearTimeout(vmReconnectTimer); vmReconnectTimer = null; }
+    try { obs.disconnect(); } catch(e) {}
+    io.emit('terminalOutput', 'Server shutting down');
+    server.close(() => process.exit(0));
+    // Hard exit if not closed in 2s
+    setTimeout(() => process.exit(0), 2000).unref();
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 server.listen(3000, () => {
     console.log('Server is running on port 3000');
