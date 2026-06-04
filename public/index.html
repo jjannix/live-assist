@@ -196,6 +196,8 @@
 
         function infer(scene) { return scene === 'Live Übertragung' ? 'game' : scene && scene !== '—' ? 'break' : 'unknown'; }
 
+        let pendingTarget = null;
+
         $$('.action-btn').forEach(btn => btn.addEventListener('click', () => {
             if (mode === 'switching') return;
             const target = btn.dataset.mode;
@@ -203,6 +205,7 @@
             
             haptic(20);
             setMode('switching');
+            pendingTarget = target;
             // Send current fader positions so the server fades to user's levels, not hardcoded 0
             const tv = parseFloat($('#tvFader').value);
             const sp = parseFloat($('#spFader').value);
@@ -217,13 +220,21 @@
 
         socket.on('currentScene', d => {
             $$('.scene-chip').forEach(b => b.classList.toggle('on', b.dataset.scene === d.sceneName));
-            $('#heroText').textContent = d.sceneName; // Bold active scene display
-            if (mode !== 'switching') setMode(infer(d.sceneName));
+            $('#heroText').textContent = d.sceneName;
+            if (mode === 'switching') return;
+            setMode(infer(d.sceneName));
         });
 
         socket.on('terminalOutput', d => {
-            if (d.includes('completed successfully')) { haptic([10, 30, 10]); toast('Done', 'ok', 1500); setMode(infer($('#heroText').textContent)); }
-            if (d.includes('Failed') || d.includes('failed')) setMode('unknown');
+            if (d.includes('completed successfully')) {
+                haptic([10, 30, 10]); toast('Done', 'ok', 1500);
+                setMode(pendingTarget || 'unknown');
+                pendingTarget = null;
+            }
+            if (d.includes('Failed') || d.includes('failed')) {
+                setMode('unknown');
+                pendingTarget = null;
+            }
         });
 
         setMode('unknown');
