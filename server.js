@@ -174,16 +174,18 @@ io.on('connection', async socket => {
     });
 
     // ── Mute toggle via Voicemeeter
+    const muteState = { 3: false, 4: false };  // tracked server-side
+
     socket.on('toggleMute', data => {
         if (!vmConnected) return;
         try {
             const strip = data.stripIndex;
-            const current = voicemeeter.getStripMute(strip);
-            const muted = current !== 0;  // Voicemeeter returns float, 0 = unmuted, anything else = muted
-            voicemeeter.setStripMute(strip, !muted);
+            const nowMuted = !muteState[strip];
+            muteState[strip] = nowMuted;
+            voicemeeter.setStripMute(strip, nowMuted);
             const label = strip === 3 ? 'TV' : 'Spotify';
-            io.emit('muteState', { stripIndex: strip, muted: !muted });
-            io.emit('terminalOutput', (muted ? 'Unmuted' : 'Muted') + ' ' + label);
+            io.emit('muteState', { stripIndex: strip, muted: nowMuted });
+            io.emit('terminalOutput', (nowMuted ? 'Muted' : 'Unmuted') + ' ' + label);
         } catch (err) {
             console.error('Failed to toggle mute:', err);
         }
