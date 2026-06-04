@@ -163,17 +163,6 @@ body[data-mode="break"] .status-txt { color: var(--amber); }
     overflow: hidden;
 }
 
-.fader-vu {
-    position: absolute; top: 0; bottom: 0;
-    right: 0;
-    width: 0;
-    background: var(--green);
-    opacity: 0.35;
-    border-radius: 22px;
-    transition: width 0.05s linear, background 0.1s;
-    pointer-events: none;
-}
-
 .fader-fill {
     position: absolute; top: 0; left: 0; bottom: 0;
     width: 50%;

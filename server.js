@@ -109,24 +109,6 @@ process.on('unhandledRejection', err => {
 connectOBSWebSocket();
 connectVoicemeeter();
 
-// ── VU Meter polling (sends levels to all clients every 50ms)
-if (voicemeeter) {
-    setInterval(() => {
-        if (!vmConnected) return;
-        try {
-            // Channel indices: Strip N = channels N*2 (left) and N*2+1 (right)
-            const tvL = voicemeeter.getLevel(1, 6);   // postFaderInput, Strip 3 left
-            const tvR = voicemeeter.getLevel(1, 7);   // Strip 3 right
-            const spL = voicemeeter.getLevel(1, 8);   // Strip 4 left
-            const spR = voicemeeter.getLevel(1, 9);   // Strip 4 right
-            io.emit('vu', {
-                tv: Math.max(tvL || -60, tvR || -60),
-                sp: Math.max(spL || -60, spR || -60)
-            });
-        } catch(e) {}
-    }, 50);
-}
-
 app.use(express.static('public'));
 
 io.on('connection', async socket => {
