@@ -36,25 +36,39 @@
                 <div class="fader-group" id="chTv">
                     <div class="fader-header">
                         <span class="ch-name">TV Broadcast</span>
-                        <span class="ch-db" id="tvDb">0.0 dB</span>
+                        <div class="fader-actions">
+                            <span class="ch-db" id="tvDb">0.0 dB</span>
+                            <button class="mute-btn" id="tvMute" aria-label="Toggle TV mute">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="fader-bar">
                         <div class="fader-fill" id="tvFill"></div>
+                        <div class="fader-vu" id="tvVu"></div>
                         <div class="fader-zero"></div>
                         <input type="range" class="fader-input" id="tvFader" min="-60" max="12" step="0.1" value="0">
                     </div>
+                    <div class="fader-presets" id="tvPresets"></div>
                 </div>
 
                 <div class="fader-group" id="chSp">
                     <div class="fader-header">
                         <span class="ch-name">Spotify</span>
-                        <span class="ch-db" id="spDb">0.0 dB</span>
+                        <div class="fader-actions">
+                            <span class="ch-db" id="spDb">0.0 dB</span>
+                            <button class="mute-btn" id="spMute" aria-label="Toggle Spotify mute">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="fader-bar">
                         <div class="fader-fill" id="spFill"></div>
+                        <div class="fader-vu" id="spVu"></div>
                         <div class="fader-zero"></div>
                         <input type="range" class="fader-input" id="spFader" min="-60" max="12" step="0.1" value="0">
                     </div>
+                    <div class="fader-presets" id="spPresets"></div>
                 </div>
             </div>
         </div>
@@ -77,6 +91,14 @@
                     <button class="chip scene-chip" data-scene="Live Übertragung">Live</button>
                     <button class="chip scene-chip" data-scene="Spotify">Spotify</button>
                     <button class="chip scene-chip" data-scene="Zen">Zen</button>
+                </div>
+            </div>
+            <div class="panel">
+                <span class="panel-lbl">PROFILES</span>
+                <div class="panel-grid" id="profileGrid">
+                    <button class="chip profile-chip" data-profile="game">Game</button>
+                    <button class="chip profile-chip" data-profile="break">Break</button>
+                    <button class="chip" id="saveProfileBtn">+ Save</button>
                 </div>
             </div>
             <div class="panel">
@@ -250,13 +272,92 @@
             el.classList.toggle('hot', v > 6);
         }
 
-        [{ f: 'tvFader', d: 'tvDb', s: 3 }, { f: 'spFader', d: 'spDb', s: 4 }].forEach(({ f, d, s }) => {
+        [{ f: 'tvFader', d: 'tvDb', s: 3, v: 'tvVu', m: 'tvMute', p: 'tvPresets' }, { f: 'spFader', d: 'spDb', s: 4, v: 'spVu', m: 'spMute', p: 'spPresets' }].forEach(({ f, d, s, v, m, p }) => {
             const el = $(`#${f}`);
             el.addEventListener('input', () => { socket.emit('setVolume', { stripIndex: s, volume: parseFloat(el.value) }); updDb(d, el.value); updFill(f); });
             let lt = 0;
-            el.addEventListener('touchend', () => { const n = Date.now(); if (n - lt < 300) { haptic(15); el.value = 0; socket.emit('setVolume', { stripIndex: s, volume: 0 }); updDb(d, 0); updFill(f); } lt = n; });
+            el.addEventListener('touchend', () => { const n = Date.now(); if (n - lt < 300) { haptic(15); cycleFaderPresets(f, d, s); } lt = n; });
             updFill(f);
+
+            // Mute toggle
+            $(`#${m}`).addEventListener('click', () => { haptic(10); socket.emit('toggleMute', { stripIndex: s }); });
         });
+
+        // ── VU Meters
+        socket.on('vu', d => {
+            ['tv', 'sp'].forEach(ch => {
+                const el = $(`#${ch}Vu`);
+                if (!el) return;
+                const db = d[ch];
+                // Map -60..0 dB to 0..100% width (logarithmic feel)
+                const pct = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+                el.style.width = pct + '%';
+                // Color: green -> amber -> red
+                if (db > -6) el.style.background = 'var(--red)';
+                else if (db > -20) el.style.background = 'var(--amber)';
+                else el.style.background = 'var(--green)';
+            });
+        });
+
+        // ── Mute state
+        socket.on('muteState', d => {
+            const btn = d.stripIndex === 3 ? $('#tvMute') : $('#spMute');
+            btn.classList.toggle('muted', d.muted);
+        });
+
+        // ── Fader presets (cycle on double-tap)
+        const faderPresets = {
+            tvFader: [-1.2, -3, -6, -10, 0],
+            spFader: [-3.5, -6, -10, -20, 0]
+        };
+        const faderPresetIdx = { tvFader: 0, spFader: 0 };
+
+        function cycleFaderPresets(faderId, dbId, stripIndex) {
+            const presets = faderPresets[faderId];
+            const idx = (faderPresetIdx[faderId] + 1) % presets.length;
+            faderPresetIdx[faderId] = idx;
+            const val = presets[idx];
+            const el = $(`#${faderId}`);
+            el.value = val;
+            socket.emit('setVolume', { stripIndex, volume: val });
+            updDb(dbId, val); updFill(faderId);
+            toast(`${val >= 0 ? '+' : ''}${val.toFixed(1)} dB`, 'info', 800);
+        }
+
+        // ── Audio Profiles
+        let profiles = {};
+
+        socket.on('profileList', p => { profiles = p; });
+        socket.emit('getProfiles');
+
+        socket.on('profileSaved', d => {
+            profiles[d.name] = d.gains;
+            toast(`Profile "${d.name}" saved`, 'ok', 1500);
+        });
+
+        socket.on('profileLoaded', d => {
+            if (d.gains[3] !== undefined) {
+                $('#tvFader').value = d.gains[3]; updDb('tvDb', d.gains[3]); updFill('tvFader');
+            }
+            if (d.gains[4] !== undefined) {
+                $('#spFader').value = d.gains[4]; updDb('spDb', d.gains[4]); updFill('spFader');
+            }
+        });
+
+        // Save current levels as a profile
+        $('#saveProfileBtn').addEventListener('click', () => {
+            const name = prompt('Profile name:');
+            if (!name) return;
+            haptic(10);
+            socket.emit('saveProfile', { name });
+        });
+
+        // Load profile on tap
+        $$('.profile-chip').forEach(btn => btn.addEventListener('click', () => {
+            haptic(10);
+            socket.emit('loadProfile', { name: btn.dataset.profile });
+            toast(`Loading ${btn.dataset.profile} profile`, 'info', 1000);
+        }));
 
         // ── Presets & Scenes
         const presets = { game: { tv: 0, sp: -60 }, break: { tv: -60, sp: 0 }, balanced: { tv: -6, sp: -6 } };

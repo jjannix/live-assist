@@ -130,6 +130,30 @@ body[data-mode="break"] .status-txt { color: var(--amber); }
 .ch-db { font-size: 13px; font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; transition: color 0.2s; }
 .ch-db.hot { color: var(--red); }
 
+.fader-actions {
+    display: flex; align-items: center; gap: 10px;
+}
+
+.mute-btn {
+    width: 32px; height: 32px;
+    border-radius: 16px;
+    background: var(--card-up);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+}
+.mute-btn:active { transform: scale(0.9); }
+.mute-btn.muted {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+}
+
+.fader-presets {
+    display: flex; gap: 4px; margin-top: 6px;
+}
+
 .fader-bar {
     position: relative;
     height: 44px; /* Taller track for easier grabbing */
@@ -137,6 +161,17 @@ body[data-mode="break"] .status-txt { color: var(--amber); }
     border-radius: 22px;
     border: 1px solid var(--border);
     overflow: hidden;
+}
+
+.fader-vu {
+    position: absolute; top: 0; bottom: 0;
+    right: 0;
+    width: 0;
+    background: var(--green);
+    opacity: 0.35;
+    border-radius: 22px;
+    transition: width 0.05s linear, background 0.1s;
+    pointer-events: none;
 }
 
 .fader-fill {
