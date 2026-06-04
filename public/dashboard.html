@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>Euros · Health</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Dashboard-specific overrides on top of style.css */
+        body { overflow-y: auto; }
+        .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 20px 16px; }
+        .dash-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+        .dash-card-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--text-3); }
+        .dash-card-val { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1.1; }
+        .dash-card-state { font-size: 11px; font-weight: 600; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+        .dash-card-state .conn-dot { width: 8px; height: 8px; }
+        .section { background: var(--card); border: 1px solid var(--border); border-radius: 18px; margin: 0 20px 16px; padding: 16px 18px; }
+        .section-title { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: var(--text-3); margin-bottom: 12px; }
+        .kv { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border); }
+        .kv:last-child { border-bottom: none; }
+        .kv-k { font-size: 12px; font-weight: 500; color: var(--text-2); }
+        .kv-v { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+        .kv-v.muted { color: var(--text-3); }
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 20px 24px; }
+        .action-btn-danger { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 0; border-radius: 16px; border: 1px solid var(--border-hl); background: var(--card); color: var(--text); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .action-btn-danger:active { transform: scale(0.96); background: var(--card-up); }
+        .action-btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+        .back-btn { width: 36px; height: 36px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .back-btn:active { transform: scale(0.9); background: var(--card-up); }
+        .back-btn svg { width: 18px; height: 18px; }
+        @media (max-width: 480px) {
+            .dash-grid { grid-template-columns: 1fr; }
+            .actions { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <button class="back-btn" onclick="location.href='/'" aria-label="Back to control panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="logo">HEALTH</span>
+        <div class="status-pill">
+            <span class="conn-dot" id="conn" data-s="wait"></span>
+            <span class="status-txt" id="uptime">--:--</span>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <div class="dash-grid">
+            <div class="dash-card">
+                <span class="dash-card-lbl">OBS</span>
+                <span class="dash-card-val" id="obsVal">—</span>
+                <span class="dash-card-state"><span class="conn-dot" id="obsDot" data-s="wait"></span><span id="obsState">connecting</span></span>
+            </div>
+            <div class="dash-card">
+                <span class="dash-card-lbl">VOICEMEETER</span>
+                <span class="dash-card-val" id="vmVal">—</span>
+                <span class="dash-card-state"><span class="conn-dot" id="vmDot" data-s="wait"></span><span id="vmState">connecting</span></span>
+            </div>
+            <div class="dash-card">
+                <span class="dash-card-lbl">SOCKET</span>
+                <span class="dash-card-val" id="sockVal">—</span>
+                <span class="dash-card-state"><span class="conn-dot" id="sockDot" data-s="wait"></span><span id="sockState">connecting</span></span>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">SERVER</div>
+            <div class="kv"><span class="kv-k">Uptime</span><span class="kv-v" id="kvUptime">—</span></div>
+            <div class="kv"><span class="kv-k">Connected clients</span><span class="kv-v" id="kvClients">—</span></div>
+            <div class="kv"><span class="kv-k">Memory (RSS)</span><span class="kv-v" id="kvRss">—</span></div>
+            <div class="kv"><span class="kv-k">Heap (used / total)</span><span class="kv-v" id="kvHeap">—</span></div>
+            <div class="kv"><span class="kv-k">System free / total</span><span class="kv-v" id="kvMem">—</span></div>
+            <div class="kv"><span class="kv-k">Load average (1/5/15m)</span><span class="kv-v" id="kvLoad">—</span></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">RUNTIME</div>
+            <div class="kv"><span class="kv-k">Node.js</span><span class="kv-v" id="kvNode">—</span></div>
+            <div class="kv"><span class="kv-k">Platform</span><span class="kv-v" id="kvPlatform">—</span></div>
+            <div class="kv"><span class="kv-k">CPU cores</span><span class="kv-v" id="kvCpus">—</span></div>
+            <div class="kv"><span class="kv-k">Hostname</span><span class="kv-v" id="kvHost">—</span></div>
+        </div>
+
+        <div class="actions">
+            <button class="action-btn-danger" id="reconnectObs">RECONNECT OBS</button>
+            <button class="action-btn-danger" id="reconnectVm">RECONNECT VOICEMEETER</button>
+        </div>
+
+    </main>
+
+    <script>
+    (() => {
+        'use strict';
+        const $ = s => document.querySelector(s);
+        const socket = io();
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function fmtUptime(s) {
+            s = Math.max(0, Math.floor(s));
+            const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+            return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+        }
+        function fmtMB(n) { return `${n} MB`; }
+        function fmtGB(n) { return `${(n / 1024).toFixed(2)} GB`; }
+
+        function setDot(id, state) { $(id).dataset.s = state; }
+        function setText(id, val) { $(id).textContent = val; }
+
+        // ── Socket connection
+        socket.on('connect', () => {
+            setDot('#conn', 'ok');
+            setDot('#sockDot', 'ok');
+            setText('#sockVal', 'online');
+            setText('#sockState', 'connected');
+        });
+        socket.on('disconnect', () => {
+            setDot('#conn', 'off');
+            setDot('#sockDot', 'off');
+            setText('#sockVal', 'offline');
+            setText('#sockState', 'disconnected');
+        });
+        socket.on('connect_error', () => {
+            setDot('#conn', 'wait');
+            setDot('#sockDot', 'wait');
+        });
+
+        // ── Backend status
+        socket.on('obsStatus', d => {
+            if (d.connected) {
+                setDot('#obsDot', 'ok');
+                setText('#obsVal', 'online');
+                setText('#obsState', 'connected');
+            } else {
+                setDot('#obsDot', 'off');
+                setText('#obsVal', 'offline');
+                setText('#obsState', 'disconnected');
+            }
+        });
+        socket.on('vmStatus', d => {
+            if (d.connected) {
+                setDot('#vmDot', 'ok');
+                setText('#vmVal', 'online');
+                setText('#vmState', 'connected');
+            } else {
+                setDot('#vmDot', 'off');
+                setText('#vmVal', 'offline');
+                setText('#vmState', 'disconnected');
+            }
+        });
+
+        // ── Periodic health stats
+        socket.on('healthStats', s => {
+            setText('#uptime', fmtUptime(s.uptime));
+            setText('#kvUptime', fmtUptime(s.uptime));
+            setText('#kvClients', String(s.clients));
+            setText('#kvRss', fmtMB(s.memory.rss));
+            setText('#kvHeap', `${fmtMB(s.memory.heapUsed)} / ${fmtMB(s.memory.heapTotal)}`);
+            setText('#kvMem', `${fmtGB(s.system.freememMB)} / ${fmtGB(s.system.totalmemMB)}`);
+            setText('#kvLoad', s.system.loadavg.join('  '));
+            setText('#kvNode', s.node.version);
+            setText('#kvPlatform', `${s.node.platform} · ${s.node.arch}`);
+            setText('#kvCpus', String(s.system.cpus));
+            setText('#kvHost', s.system.hostname);
+        });
+
+        // ── Force reconnect
+        function btnFlash(id) {
+            const b = $(id);
+            b.disabled = true;
+            const old = b.textContent;
+            b.textContent = 'REQUESTED…';
+            setTimeout(() => { b.disabled = false; b.textContent = old; }, 1500);
+        }
+        $('#reconnectObs').addEventListener('click', () => {
+            socket.emit('requestReconnect', { target: 'obs' });
+            btnFlash('#reconnectObs');
+        });
+        $('#reconnectVm').addEventListener('click', () => {
+            socket.emit('requestReconnect', { target: 'vm' });
+            btnFlash('#reconnectVm');
+        });
+    })();
+    </script>
+</body>
+</html>
