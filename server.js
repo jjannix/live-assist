@@ -197,13 +197,11 @@ io.on('connection', async socket => {
             }
 
             io.emit('terminalOutput', 'Automated action completed successfully.');
-        } catch (err) {
-            console.error('Automated action (GameAction) failed:', err);
+            io.emit('actionDone', 'game');
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
+            io.emit('actionFailed');
         }
-    });
-
-    socket.on('PauseAction', async data => {
+    });', async data => {
         try {
             const tvTarget = data && data.tvTarget !== undefined ? data.tvTarget : -60;
             const spTarget = data && data.spTarget !== undefined ? data.spTarget : 0;
@@ -235,13 +233,9 @@ io.on('connection', async socket => {
             }
 
             io.emit('terminalOutput', 'Automated action completed successfully.');
-        } catch (err) {
-            console.error('Automated action (PauseAction) failed:', err);
+            io.emit('actionDone', 'break');
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
-        }
-    });
-
-    socket.on('disconnect', () => {
+            io.emit('actionFailed');, () => {
         console.log('Client disconnected');
         io.emit('terminalOutput', 'Client disconnected');
     });

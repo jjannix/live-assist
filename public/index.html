@@ -225,16 +225,15 @@
             setMode(infer(d.sceneName));
         });
 
-        socket.on('terminalOutput', d => {
-            if (d.includes('completed successfully')) {
-                haptic([10, 30, 10]); toast('Done', 'ok', 1500);
-                setMode(pendingTarget || 'unknown');
-                pendingTarget = null;
-            }
-            if (d.includes('Failed') || d.includes('failed')) {
-                setMode('unknown');
-                pendingTarget = null;
-            }
+        socket.on('actionDone', target => {
+            haptic([10, 30, 10]); toast('Done', 'ok', 1500);
+            setMode(target || pendingTarget || 'unknown');
+            pendingTarget = null;
+        });
+
+        socket.on('actionFailed', () => {
+            setMode('unknown');
+            pendingTarget = null;
         });
 
         setMode('unknown');
