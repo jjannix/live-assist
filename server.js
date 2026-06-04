@@ -2,10 +2,12 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
-const voicemeeter = require('voicemeeter-remote');
+let voicemeeter;
+try { voicemeeter = require('voicemeeter-remote'); } catch (e) { console.log('Voicemeeter module not available'); }
 const dotenv = require('dotenv');
 
 dotenv.config();
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
@@ -16,6 +18,8 @@ async function connectOBSWebSocket() {
     try {
         await obs.connect(process.env.OBS_WEBSOCKET_URL, process.env.OBS_WEBSOCKET_PASSWORD);
         console.log('Connected to OBS WebSocket');
+        io.emit('obsStatus', { connected: true });
+        io.emit('terminalOutput', 'Connected to OBS WebSocket');
 
         const { scenes } = await obs.call('GetSceneList');
         console.log('Available scenes:');
@@ -34,28 +38,77 @@ async function connectOBSWebSocket() {
         io.emit('currentScene', { sceneName: currentScene.currentProgramSceneName });
     } catch (err) {
         console.error('Failed to connect to OBS WebSocket:', err);
+        io.emit('obsStatus', { connected: false });
+        io.emit('terminalOutput', 'Failed to connect to OBS WebSocket: ' + err.message);
     }
 }
 
+// Listen for OBS scene changes (e.g. someone switches directly in OBS)
+obs.on('CurrentProgramSceneChanged', data => {
+    console.log('OBS scene changed:', data.sceneName);
+    io.emit('currentScene', { sceneName: data.sceneName });
+    io.emit('terminalOutput', 'OBS scene changed to: ' + data.sceneName);
+});
+
+obs.on('ConnectionClosed', () => {
+    console.error('OBS WebSocket disconnected');
+    io.emit('obsStatus', { connected: false });
+    io.emit('terminalOutput', 'OBS WebSocket disconnected');
+});
+
+obs.on('ConnectionError', err => {
+    console.error('OBS WebSocket error:', err);
+    io.emit('obsStatus', { connected: false });
+});
+
+let vmConnected = false;
+
 async function connectVoicemeeter() {
+    if (!voicemeeter) {
+        console.log('Voicemeeter module not loaded — skipping');
+        io.emit('vmStatus', { connected: false });
+        io.emit('terminalOutput', 'Voicemeeter not available — audio controls disabled');
+        return;
+    }
     try {
         await voicemeeter.init();
         await voicemeeter.login();
         await voicemeeter.updateDeviceList();
+        vmConnected = true;
         console.log('Connected to Voicemeeter');
+        io.emit('vmStatus', { connected: true });
+        io.emit('terminalOutput', 'Connected to Voicemeeter');
     } catch (err) {
-        console.error('Failed to connect to Voicemeeter:', err);
+        vmConnected = false;
+        console.error('Failed to connect to Voicemeeter:', err && err.message ? err.message : err);
+        io.emit('vmStatus', { connected: false });
+        io.emit('terminalOutput', 'Voicemeeter not available — audio controls disabled');
     }
 }
+
+process.on('uncaughtException', err => {
+    console.error('Uncaught exception:', err && err.message ? err.message : err);
+});
+process.on('unhandledRejection', err => {
+    console.error('Unhandled rejection:', err && err.message ? err.message : err);
+});
 
 connectOBSWebSocket();
 connectVoicemeeter();
 
 app.use(express.static('public'));
 
-io.on('connection', socket => {
+io.on('connection', async socket => {
     console.log('Client connected');
-    io.emit('terminalOutput', 'Client connected');
+
+    // Send current OBS status and scene to newly connected client
+    try {
+        const currentScene = await obs.call('GetCurrentProgramScene');
+        socket.emit('currentScene', { sceneName: currentScene.currentProgramSceneName });
+        socket.emit('obsStatus', { connected: true });
+    } catch (err) {
+        socket.emit('obsStatus', { connected: false });
+    }
 
     socket.on('transition', async data => {
         try {
@@ -93,9 +146,13 @@ io.on('connection', socket => {
     });
 
     socket.on('setVolume', async data => {
+        if (!vmConnected) {
+            socket.emit('terminalOutput', 'Voicemeeter not connected — cannot set volume');
+            return;
+        }
         try {
             const volume = parseFloat(data.volume);
-            await voicemeeter.setStripGain(data.stripIndex, volume);
+            voicemeeter.setStripGain(data.stripIndex, volume);
             console.log('Set volume for virtual input:', data.stripIndex, 'to', volume, 'dB');
             io.emit('terminalOutput', 'Set volume for virtual input: ' + data.stripIndex + ' to ' + volume + ' dB');
         } catch (err) {
@@ -106,82 +163,77 @@ io.on('connection', socket => {
 
     socket.on('GameAction', async () => {
         try {
-            const fadeSteps = 100; // Number of steps for fading (adjust for smoothness)
-            const stepDuration = 1 / fadeSteps;
-    
-            // Step 1: Fade out Spotify Input (Strip 4)
-            io.emit('terminalOutput', 'Starting to fade out Spotify Input.');
-            for (let i = 0; i <= fadeSteps; i++) {
-                const progress = i / fadeSteps;
-                const spotifyInputGain = Math.round(-60 * progress);
-                await voicemeeter.setStripGain(4, spotifyInputGain);
-                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            // Switch OBS scene first for instant visual feedback
+            await obs.call('SetCurrentProgramScene', { sceneName: 'Live Übertragung' });
+            io.emit('terminalOutput', 'Switched to scene: Live Übertragung');
+
+            if (vmConnected) {
+                const fadeSteps = 60;
+                const stepDuration = 15; // ms
+
+                // Step 1: Fade out Spotify Input (Strip 4)
+                io.emit('terminalOutput', 'Starting to fade out Spotify Input.');
+                for (let i = 0; i <= fadeSteps; i++) {
+                    const progress = i / fadeSteps;
+                    const spotifyInputGain = Math.round(-60 * progress);
+                    try { voicemeeter.setStripGain(4, spotifyInputGain); } catch(e) {}
+                    await new Promise(resolve => setTimeout(resolve, stepDuration));
+                }
+                io.emit('terminalOutput', 'Spotify Input faded out.');
+
+                // Step 2: Fade in Main Input for OBS transition sound (Strip 3)
+                io.emit('terminalOutput', 'Fading in Main Input for OBS transition.');
+                for (let i = 0; i <= fadeSteps; i++) {
+                    const progress = i / fadeSteps;
+                    const mainInputGain = Math.round(-60 * (1 - progress));
+                    try { voicemeeter.setStripGain(3, mainInputGain); } catch(e) {}
+                    await new Promise(resolve => setTimeout(resolve, stepDuration));
+                }
+            } else {
+                io.emit('terminalOutput', 'Voicemeeter not connected — skipping audio fades.');
             }
-            io.emit('terminalOutput', 'Spotify Input faded out.');
-    
-            // Step 2: Fade in Main Input for OBS transition sound (Strip 3)
-            io.emit('terminalOutput', 'Fading in Main Input for OBS transition.');
-            for (let i = 0; i <= fadeSteps; i++) {
-                const progress = i / fadeSteps;
-                const mainInputGain = Math.round(-60 * (1 - progress));
-                await voicemeeter.setStripGain(3, mainInputGain);
-                await new Promise(resolve => setTimeout(resolve, stepDuration));
-            }
-    
-            // Step 3: Switch to OBS Scene "Szene 2"
-            await obs.call('SetCurrentProgramScene', { sceneName: 'Szene 2' });
-            io.emit('terminalOutput', 'Switched to scene: Szene 2');
-    
-            // Step 4: Wait for OBS transition to complete
-            await new Promise(resolve => setTimeout(resolve, 5000));
-    
+
             io.emit('terminalOutput', 'Automated action completed successfully.');
         } catch (err) {
-            console.error('Automated action failed:', err);
+            console.error('Automated action (GameAction) failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
         }
     });
 
     socket.on('PauseAction', async () => {
         try {
-            // Switch to OBS Scene "Szene 2"
-            await obs.call('SetCurrentProgramScene', { sceneName: 'Szene 2' });
-            io.emit('terminalOutput', 'Switched to scene: Szene 2');
-    
-            // Emit terminal output indicating OBS scene switch initiation
-            io.emit('terminalOutput', 'Initiating OBS scene switch.');
-    
-            // Wait for 5 seconds to ensure the OBS transition completes
-            await new Promise(resolve => setTimeout(resolve, 5500));
-    
-            // Start fading out Main Input and fading in Spotify Input simultaneously
-            const fadeSteps = 100; // Number of steps for fading (adjust for smoothness)
-            const stepDuration = 1 / fadeSteps; // Total duration divided by steps
-    
-            for (let i = 0; i <= fadeSteps; i++) {
-                const progress = i / fadeSteps;
-                const mainInputGain = Math.round(-60 * progress);
-                const spotifyInputGain = Math.round(-60 * (1 - progress));
-    
-                await Promise.all([
-                    voicemeeter.setStripGain(3, mainInputGain),
-                    voicemeeter.setStripGain(4, spotifyInputGain)
-                ]);
-    
-                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            // Switch OBS scene first for instant visual feedback
+            await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
+            io.emit('terminalOutput', 'Switched to scene: Spotify');
+
+            if (vmConnected) {
+                const fadeSteps = 60;
+                const stepDuration = 15; // ms
+
+                for (let i = 0; i <= fadeSteps; i++) {
+                    const progress = i / fadeSteps;
+                    const mainInputGain = Math.round(-60 * progress);
+                    const spotifyInputGain = Math.round(-60 * (1 - progress));
+
+                    try {
+                        voicemeeter.setStripGain(3, mainInputGain);
+                        voicemeeter.setStripGain(4, spotifyInputGain);
+                    } catch(e) {}
+
+                    await new Promise(resolve => setTimeout(resolve, stepDuration));
+                }
+
+                io.emit('terminalOutput', 'Faded out Main Input and faded in Spotify Input.');
+            } else {
+                io.emit('terminalOutput', 'Voicemeeter not connected — skipping audio fades.');
             }
-    
-            io.emit('terminalOutput', 'Faded out Main Input and faded in Spotify Input.');
+
             io.emit('terminalOutput', 'Automated action completed successfully.');
         } catch (err) {
-            console.error('Automated action failed:', err);
+            console.error('Automated action (PauseAction) failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
         }
     });
-    
-    
-    
-    
 
     socket.on('disconnect', () => {
         console.log('Client disconnected');
