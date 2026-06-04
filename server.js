@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const os = require('os');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
 let voicemeeter;
@@ -12,6 +13,8 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 const obs = new OBSWebSocket();
+
+const serverStartTime = Date.now();
 
 // ── Auto-reconnect state & helpers
 const RECONNECT_INITIAL_MS = 1000;
@@ -341,6 +344,18 @@ io.on('connection', async socket => {
         socket.emit('profileList', profiles);
     });
 
+    // ── Health dashboard: force-reconnect a backend
+    socket.on('requestReconnect', data => {
+        if (data && data.target === 'obs') {
+            io.emit('terminalOutput', 'Manual OBS reconnect requested from dashboard');
+            try { obs.disconnect(); } catch (e) {}
+            connectOBSWebSocket();
+        } else if (data && data.target === 'vm') {
+            io.emit('terminalOutput', 'Manual Voicemeeter reconnect requested from dashboard');
+            connectVoicemeeter();
+        }
+    });
+
     // ── Per-scene auto-profiles
     socket.on('saveSceneProfile', data => {
         if (!vmConnected) return;
@@ -457,4 +472,32 @@ process.on('SIGTERM', shutdown);
 server.listen(3000, () => {
     console.log('Server is running on port 3000');
     io.emit('terminalOutput', 'Server is running on port 3000');
+
+    // ── Health dashboard: periodic stats broadcast
+    function buildHealthStats() {
+        const mem = process.memoryUsage();
+        return {
+            uptime: Math.floor((Date.now() - serverStartTime) / 1000),
+            clients: io.engine.clientsCount,
+            memory: {
+                rss: Math.round(mem.rss / 1024 / 1024),
+                heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+            },
+            node: {
+                version: process.version,
+                platform: process.platform,
+                arch: process.arch,
+            },
+            system: {
+                hostname: os.hostname(),
+                cpus: os.cpus().length,
+                loadavg: os.loadavg().map(n => n.toFixed(2)),
+                freememMB: Math.round(os.freemem() / 1024 / 1024),
+                totalmemMB: Math.round(os.totalmem() / 1024 / 1024),
+            },
+        };
+    }
+
+    setInterval(() => io.emit('healthStats', buildHealthStats()), 3000);
 });

@@ -68,6 +68,18 @@ body.dim {
     border: 1px solid var(--border);
 }
 
+.topbar-link {
+    width: 32px; height: 32px;
+    border-radius: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+}
+.topbar-link:active { transform: scale(0.9); background: var(--card-up); }
+.topbar-link svg { width: 16px; height: 16px; }
+
 .conn-dot {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--amber); transition: all 0.3s;

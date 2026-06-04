@@ -1,4 +1,4 @@
-const CACHE_NAME = 'static-cache-v2';
+const CACHE_NAME = 'static-cache-v3';
 
 self.addEventListener('install', event => {
     event.waitUntil(
@@ -6,7 +6,8 @@ self.addEventListener('install', event => {
             return cache.addAll([
                 './style.css',
                 './app.js',
-                './manifest.json'
+                './manifest.json',
+                './dashboard.html'
             ]);
         })
     );
@@ -26,7 +27,7 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     // Always fetch HTML fresh from network
     if (url.pathname.endsWith('/') || url.pathname.endsWith('.html')) {
-        event.respondWith(fetch(event.request).catch(() => caches.match('./index.html')));
+        event.respondWith(fetch(event.request).catch(() => caches.match(event.request).catch(() => caches.match('./index.html'))));
         return;
     }
     // Cache-first for assets
