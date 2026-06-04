@@ -18,6 +18,12 @@ const RECONNECT_INITIAL_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const VM_HEALTH_CHECK_MS = 30000;
 
+// Strip index used by the periodic VM health probe. Defaults to 3 (TV Broadcast
+// in the project's standard layout). Override via VM_HEALTH_PROBE_STRIP if your
+// layout differs — must be a non-negative integer.
+const vmHealthProbeRaw = parseInt(process.env.VM_HEALTH_PROBE_STRIP, 10);
+const VM_HEALTH_PROBE_STRIP = Number.isInteger(vmHealthProbeRaw) && vmHealthProbeRaw >= 0 ? vmHealthProbeRaw : 3;
+
 let shuttingDown = false;
 let obsReconnectAttempt = 0;
 let obsReconnectTimer = null;
@@ -63,10 +69,11 @@ function scheduleVMReconnect() {
 
 function startVMHealthCheck() {
     if (vmHealthCheckTimer || !voicemeeter) return;
+    console.log(`VM health check: probing strip ${VM_HEALTH_PROBE_STRIP} every ${VM_HEALTH_CHECK_MS / 1000}s`);
     vmHealthCheckTimer = setInterval(() => {
         if (!vmConnected) return;
         try {
-            voicemeeter.getStripGain(3);
+            voicemeeter.getStripGain(VM_HEALTH_PROBE_STRIP);
         } catch (err) {
             console.error('VM health check failed:', err && err.message ? err.message : err);
             vmConnected = false;
