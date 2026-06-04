@@ -75,6 +75,7 @@ obs.on('ConnectionError', err => {
 });
 
 let vmConnected = false;
+const muteState = { 3: false, 4: false };
 
 async function connectVoicemeeter() {
     if (!voicemeeter) {
@@ -192,8 +193,6 @@ io.on('connection', async socket => {
     });
 
     // ── Mute toggle via Voicemeeter
-    const muteState = { 3: false, 4: false };  // tracked server-side
-
     socket.on('toggleMute', data => {
         if (!vmConnected) return;
         try {
