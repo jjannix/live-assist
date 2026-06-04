@@ -6,6 +6,7 @@ self.addEventListener('install', event => {
                 './index.html',
                 './style.css',
                 './app.js',
+                './manifest.json',
                 './socket.io/socket.io.js'
             ]);
         })
