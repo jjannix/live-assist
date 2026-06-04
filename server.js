@@ -161,8 +161,11 @@ io.on('connection', async socket => {
         }
     });
 
-    socket.on('GameAction', async () => {
+    socket.on('GameAction', async data => {
         try {
+            const tvTarget = data && data.tvTarget !== undefined ? data.tvTarget : 0;
+            const spTarget = data && data.spTarget !== undefined ? data.spTarget : -60;
+
             // Switch OBS scene first for instant visual feedback
             await obs.call('SetCurrentProgramScene', { sceneName: 'Live Übertragung' });
             io.emit('terminalOutput', 'Switched to scene: Live Übertragung');
@@ -175,17 +178,17 @@ io.on('connection', async socket => {
                 io.emit('terminalOutput', 'Starting to fade out Spotify Input.');
                 for (let i = 0; i <= fadeSteps; i++) {
                     const progress = i / fadeSteps;
-                    const spotifyInputGain = Math.round(-60 * progress);
+                    const spotifyInputGain = Math.round(-60 * progress + spTarget * (1 - progress));
                     try { voicemeeter.setStripGain(4, spotifyInputGain); } catch(e) {}
                     await new Promise(resolve => setTimeout(resolve, stepDuration));
                 }
                 io.emit('terminalOutput', 'Spotify Input faded out.');
 
-                // Step 2: Fade in Main Input for OBS transition sound (Strip 3)
+                // Step 2: Fade in Main Input (Strip 3) to user's level
                 io.emit('terminalOutput', 'Fading in Main Input for OBS transition.');
                 for (let i = 0; i <= fadeSteps; i++) {
                     const progress = i / fadeSteps;
-                    const mainInputGain = Math.round(-60 * (1 - progress));
+                    const mainInputGain = Math.round(-60 * (1 - progress) + tvTarget * progress);
                     try { voicemeeter.setStripGain(3, mainInputGain); } catch(e) {}
                     await new Promise(resolve => setTimeout(resolve, stepDuration));
                 }
@@ -200,8 +203,11 @@ io.on('connection', async socket => {
         }
     });
 
-    socket.on('PauseAction', async () => {
+    socket.on('PauseAction', async data => {
         try {
+            const tvTarget = data && data.tvTarget !== undefined ? data.tvTarget : -60;
+            const spTarget = data && data.spTarget !== undefined ? data.spTarget : 0;
+
             // Switch OBS scene first for instant visual feedback
             await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
             io.emit('terminalOutput', 'Switched to scene: Spotify');
@@ -212,8 +218,8 @@ io.on('connection', async socket => {
 
                 for (let i = 0; i <= fadeSteps; i++) {
                     const progress = i / fadeSteps;
-                    const mainInputGain = Math.round(-60 * progress);
-                    const spotifyInputGain = Math.round(-60 * (1 - progress));
+                    const mainInputGain = Math.round(tvTarget * progress + (-60) * (1 - progress));
+                    const spotifyInputGain = Math.round(spTarget * progress + (-60) * (1 - progress));
 
                     try {
                         voicemeeter.setStripGain(3, mainInputGain);

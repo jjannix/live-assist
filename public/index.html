@@ -199,15 +199,18 @@
         $$('.action-btn').forEach(btn => btn.addEventListener('click', () => {
             if (mode === 'switching') return;
             const target = btn.dataset.mode;
-            if (target === mode) return; // Ignore if already active
+            if (target === mode) return;
             
             haptic(20);
             setMode('switching');
+            // Send current fader positions so the server fades to user's levels, not hardcoded 0
+            const tv = parseFloat($('#tvFader').value);
+            const sp = parseFloat($('#spFader').value);
             if (target === 'break') {
-                socket.emit('PauseAction');
+                socket.emit('PauseAction', { tvTarget: tv, spTarget: sp });
                 toast('Switching to break', 'warn');
             } else {
-                socket.emit('GameAction');
+                socket.emit('GameAction', { tvTarget: tv, spTarget: sp });
                 toast('Switching to game', 'ok');
             }
         }));
