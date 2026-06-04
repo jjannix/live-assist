@@ -19,13 +19,16 @@
     <!-- Header (Status Bar) -->
     <header class="topbar">
         <span class="logo">EUROS</span>
-        <button class="topbar-link" onclick="location.href='/dashboard.html'" aria-label="Open health dashboard" title="Health dashboard">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        </button>
+        <div class="topbar-center">
+            <button class="topbar-link" onclick="location.href='/dashboard.html'" aria-label="Open health dashboard" title="Health dashboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </button>
+        </div>
         <div class="status-pill">
             <span class="conn-dot" id="conn" data-s="wait"></span>
             <span class="conn-dot" id="obsConn" data-s="wait"></span>
             <span class="status-txt" id="statusTxt">Connecting...</span>
+            <span class="audio-badge" id="audioBadge" title="Audio backend" hidden>VM</span>
             <span class="timer" id="timer">00:00</span>
         </div>
     </header>
@@ -94,13 +97,14 @@
                     <button class="chip scene-chip" data-scene="Zen">Zen</button>
                 </div>
             </div>
-            <div class="panel">
+            <div class="panel" id="profilesPanel">
                 <span class="panel-lbl">PROFILES</span>
                 <div class="panel-grid" id="profileGrid">
                     <button class="chip profile-chip" data-profile="game">Game</button>
                     <button class="chip profile-chip" data-profile="break">Break</button>
                     <button class="chip" id="saveProfileBtn">+ Save</button>
                 </div>
+                <div class="panel-hint" id="profileHint" hidden>Not available in simple mode</div>
             </div>
             <div class="panel">
                 <span class="panel-lbl">PRESETS</span>
@@ -161,6 +165,7 @@
         const $$ = s => document.querySelectorAll(s);
         const socket = io();
         let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now();
+        let audioCapabilities = null; // filled on audioBackendStatus
         const haptic = ms => { if (navigator.vibrate) navigator.vibrate(ms); };
 
         // ── Timer
@@ -191,6 +196,27 @@
 
         // ── OBS Status
         socket.on('obsStatus', d => { $('#obsConn').dataset.s = d.connected ? 'ok' : 'off'; });
+
+        // ── Audio backend status & capabilities
+        socket.on('audioBackendStatus', d => {
+            audioCapabilities = d.capabilities;
+            const badge = $('#audioBadge');
+            if (d.backend === 'voicemeeter') { badge.textContent = 'VM'; badge.hidden = false; }
+            else if (d.backend === 'windows-simple') { badge.textContent = 'APP'; badge.hidden = false; }
+            else if (d.backend === 'none') { badge.textContent = '—'; badge.hidden = false; }
+            else { badge.hidden = true; }
+
+            // Show/hide profiles panel based on capabilities
+            const profilesPanel = $('#profilesPanel');
+            const profileHint = $('#profileHint');
+            if (d.capabilities && !d.capabilities.profiles) {
+                profilesPanel.classList.add('disabled');
+                profileHint.hidden = false;
+            } else {
+                profilesPanel.classList.remove('disabled');
+                profileHint.hidden = true;
+            }
+        });
 
         // ── Dim
         $('#dimBtn').onclick = () => { document.body.classList.toggle('dim'); haptic(8); };

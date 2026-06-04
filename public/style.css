@@ -107,6 +107,22 @@ body[data-mode="break"] .status-txt { color: var(--amber); }
     padding-left: 12px;
 }
 
+.audio-badge {
+    font-size: 9px; font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    background: rgba(139,92,246,0.15);
+    padding: 2px 6px;
+    border-radius: 6px;
+    margin-left: 4px;
+    border-left: 1px solid var(--border);
+    padding-left: 8px;
+}
+
+.topbar-center {
+    display: flex; align-items: center; justify-content: center;
+}
+
 /* ═══ Main Content Area ═══ */
 .main {
     flex: 1;
@@ -299,6 +315,17 @@ body.dim[data-mode="break"] .hero-ring { border-color: rgba(120,53,15,0.4); box-
     background: var(--card-up);
     color: var(--text);
     border-color: var(--border-hl);
+}
+
+/* Disabled panel (unsupported features) */
+.panel.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+}
+.panel-hint {
+    font-size: 10px; font-weight: 500;
+    color: var(--text-3);
+    padding-top: 4px;
 }
 
 /* ═══ Bottom Dock (Primary Interactions) ═══ */

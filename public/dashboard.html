@@ -64,9 +64,10 @@
                 <span class="dash-card-state"><span class="conn-dot" id="obsDot" data-s="wait"></span><span id="obsState">connecting</span></span>
             </div>
             <div class="dash-card">
-                <span class="dash-card-lbl">VOICEMEETER</span>
+                <span class="dash-card-lbl">AUDIO</span>
                 <span class="dash-card-val" id="vmVal">—</span>
                 <span class="dash-card-state"><span class="conn-dot" id="vmDot" data-s="wait"></span><span id="vmState">connecting</span></span>
+                <span class="dash-card-state" style="margin-top:2px;font-size:10px;color:var(--text-3)" id="vmBackend">backend: —</span>
             </div>
             <div class="dash-card">
                 <span class="dash-card-lbl">SOCKET</span>
@@ -95,7 +96,7 @@
 
         <div class="actions">
             <button class="action-btn-danger" id="reconnectObs">RECONNECT OBS</button>
-            <button class="action-btn-danger" id="reconnectVm">RECONNECT VOICEMEETER</button>
+            <button class="action-btn-danger" id="reconnectVm">RECONNECT AUDIO</button>
         </div>
 
     </main>
@@ -158,6 +159,14 @@
                 setText('#vmVal', 'offline');
                 setText('#vmState', 'disconnected');
             }
+        });
+
+        // ── Audio backend info
+        socket.on('audioBackendStatus', d => {
+            const label = d.backend === 'voicemeeter' ? 'Voicemeeter' :
+                          d.backend === 'windows-simple' ? 'Windows (per-app)' :
+                          d.backend === 'none' ? 'None' : d.backend;
+            setText('#vmBackend', 'backend: ' + label);
         });
 
         // ── Periodic health stats

@@ -13,7 +13,9 @@
     "express": "^4.19.2",
     "obs-websocket-js": "^5.0.5",
     "socket.io": "^4.7.5",
-    "vban": "^1.2.5",
+    "vban": "^1.2.5"
+  },
+  "optionalDependencies": {
     "voicemeeter-connector": "^1.4.1",
     "voicemeeter-remote": "^0.5.0"
   }
