@@ -1,11 +1,16 @@
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
-        .then(reg => console.log('SW registered', reg))
-        .catch(err => console.log('SW failed', err));
+        .then(reg => {
+            console.log('Service worker registered!', reg);
+        })
+        .catch(err => {
+            console.log('Service worker registration failed:', err);
+        });
 }
 
-// Register as PWA manifest
-const link = document.createElement('link');
-link.rel = 'manifest';
-link.href = '/manifest.json';
-document.head.appendChild(link);
+const socket = io();
+
+function transition(sceneName) {
+    socket.emit('transition', { sceneName });
+}
+    

@@ -2,293 +2,118 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#000000">
-    <title>Euros Studio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jnk Euros Studio</title>
     <script src="/socket.io/socket.io.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
-<body data-mode="unknown">
-
-    <!-- Header (Status Bar) -->
-    <header class="topbar">
-        <span class="logo">EUROS</span>
-        <div class="status-pill">
-            <span class="conn-dot" id="conn" data-s="wait"></span>
-            <span class="conn-dot" id="obsConn" data-s="wait"></span>
-            <span class="status-txt" id="statusTxt">Connecting...</span>
-            <span class="timer" id="timer">00:00</span>
-        </div>
+<body>
+    <header>
+        <h1>Euros Studio</h1>
     </header>
+    
+    <main>
+        <div class="container">
+            <h2>OBS Scenes</h2>
+            <button id="szene2Button">Switch to Szene 2</button>
+            <button id="spotiQButton">Switch to Ard</button>
+            <button id="szene3Button">Switch to Szene 3</button>
+            <h3>Current Scene: <span id="currentScene">Loading...</span></h3>
+        </div>
 
-    <!-- Main Content -->
-    <main class="main">
+        <div class="container">
+            <h2>Voicemeeter Inputs</h2>
+            <h3>Main Input (Voicemeeter VAIO)</h3>
+            <button ondblclick="setVolume(3, 0); resetSlider('mainInputSlider', 0)">Set to 0 dB</button>
+            <input id="mainInputSlider" type="range" min="-60" max="12" step="0.1" value="0" ondblclick="setVolume(3, 0); resetSlider('mainInputSlider', 0)" oninput="updateVolume(3, this.value)">
         
-        <!-- Faders -->
-        <div class="faders-wrap">
-            <div class="faders">
-                <div class="fader-group" id="chTv">
-                    <div class="fader-header">
-                        <span class="ch-name">TV Broadcast</span>
-                        <span class="ch-db" id="tvDb">0.0 dB</span>
-                    </div>
-                    <div class="fader-bar">
-                        <div class="fader-fill" id="tvFill"></div>
-                        <div class="fader-zero"></div>
-                        <input type="range" class="fader-input" id="tvFader" min="-60" max="12" step="0.1" value="0">
-                    </div>
-                </div>
-
-                <div class="fader-group" id="chSp">
-                    <div class="fader-header">
-                        <span class="ch-name">Spotify</span>
-                        <span class="ch-db" id="spDb">0.0 dB</span>
-                    </div>
-                    <div class="fader-bar">
-                        <div class="fader-fill" id="spFill"></div>
-                        <div class="fader-zero"></div>
-                        <input type="range" class="fader-input" id="spFader" min="-60" max="12" step="0.1" value="0">
-                    </div>
-                </div>
-            </div>
+            <h3>Spotify Input (Voicemeeter AUX)</h3>
+            <button ondblclick="setVolume(4, 0); resetSlider('spotifyInputSlider', 0)">Set to 0 dB</button>
+            <input id="spotifyInputSlider" type="range" min="-60" max="12" step="0.1" value="0" ondblclick="setVolume(4, 0); resetSlider('spotifyInputSlider', 0)" oninput="updateVolume(4, this.value)">
         </div>
 
-        <!-- Hero Space (Dynamic State Display) -->
-        <div class="hero-space">
-            <div class="hero-ring" id="heroRing">
-                <svg id="heroIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10"></circle>
-                </svg>
-            </div>
-            <div class="hero-text" id="heroText">Waiting...</div>
+        <div class="container">
+            <h2>Automated Action</h2>
+            <button id="PauseActionButton">Pause</button>
+            <button id="GameActionButton">Zum Spiel</button>
         </div>
 
-        <!-- Quick Panels: Scenes & Presets -->
-        <div class="quick-panels">
-            <div class="panel">
-                <span class="panel-lbl">SCENES</span>
-                <div class="panel-grid">
-                    <button class="chip scene-chip" data-scene="Live Übertragung">Live</button>
-                    <button class="chip scene-chip" data-scene="Spotify">Spotify</button>
-                    <button class="chip scene-chip" data-scene="Zen">Zen</button>
-                </div>
-            </div>
-            <div class="panel">
-                <span class="panel-lbl">PRESETS</span>
-                <div class="panel-grid">
-                    <button class="chip preset-chip" data-preset="game">Game</button>
-                    <button class="chip preset-chip" data-preset="break">Break</button>
-                    <button class="chip preset-chip" data-preset="balanced">Mix</button>
-                </div>
-            </div>
+        <div class="container">
+            <h2>Terminal Output</h2>
+            <div id="terminalOutput" class="output-box"></div>
         </div>
 
+        <div class="container">
+            <button id="darkModeToggle">Toggle Dark Mode</button>
+        </div>
     </main>
 
-    <!-- Bottom Dock (Primary Mobile Interactions) -->
-    <div class="dock">
-        <div class="dock-utils">
-            <button class="util-btn" id="dimBtn" aria-label="Toggle Dim Mode">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </button>
-            <span class="dock-hint">Main Actions</span>
-            <button class="util-btn" id="logBtn" aria-label="Activity Log">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-                <span class="badge" id="badge" hidden>0</span>
-            </button>
-        </div>
-        <div class="dock-actions">
-            <button class="action-btn game" data-mode="game">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-                <span>Game On</span>
-            </button>
-            <button class="action-btn break" data-mode="break">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                <span>Break</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Toasts -->
-    <div class="toast-box" id="toastBox"></div>
-
-    <!-- Drawer -->
-    <div class="drawer-bg" id="drawerBg"></div>
-    <div class="drawer" id="drawer">
-        <div class="drawer-grip" id="drawerGrip"><div></div></div>
-        <div class="drawer-bar">
-            <span class="drawer-title">Activity Log</span>
-            <button class="util-btn" id="clearLog" style="border:none;background:transparent;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-        </div>
-        <div class="log" id="log"></div>
-    </div>
+    <footer>
+        <p>&copy; 2024 Jannik. All rights reserved.</p>
+    </footer>
 
     <script>
-    (() => {
-        'use strict';
-        const $ = s => document.querySelector(s);
-        const $$ = s => document.querySelectorAll(s);
         const socket = io();
-        let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now();
-        const haptic = ms => { if (navigator.vibrate) navigator.vibrate(ms); };
 
-        // ── Timer
-        function tick() {
-            const s = Math.floor((Date.now() - t0) / 1000);
-            const pad = n => String(n).padStart(2, '0');
-            const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-            $('#timer').textContent = h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
-        }
-        setInterval(tick, 1000); tick();
-
-        // ── Toast
-        function toast(msg, type = 'info', dur = 2500) {
-            const c = $('#toastBox');
-            while (c.children.length >= 2) c.removeChild(c.firstChild);
-            const t = document.createElement('div');
-            t.className = `toast t-${type}`;
-            t.textContent = msg;
-            c.appendChild(t);
-            requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
-            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, dur);
-        }
-
-        // ── Socket
-        socket.on('connect', () => { $('#conn').dataset.s = 'ok'; t0 = Date.now(); });
-        socket.on('disconnect', () => { $('#conn').dataset.s = 'off'; toast('Connection lost', 'err'); });
-        socket.on('connect_error', () => { $('#conn').dataset.s = 'wait'; });
-
-        // ── OBS Status
-        socket.on('obsStatus', d => { $('#obsConn').dataset.s = d.connected ? 'ok' : 'off'; });
-
-        // ── Dim
-        $('#dimBtn').onclick = () => { document.body.classList.toggle('dim'); haptic(8); };
-
-        // ── Mode / Action Buttons
-        function setMode(m) {
-            mode = m;
-            document.body.dataset.mode = m;
-
-            $('#chTv').classList.toggle('idle', m === 'break');
-            $('#chSp').classList.toggle('idle', m === 'game');
-
-            const labels = { game: 'Live: Broadcast', break: 'Live: Spotify', unknown: 'Waiting...', switching: 'Switching...' };
-            $('#statusTxt').textContent = labels[m] || '';
-
-            // Update Hero Icon
-            const icon = $('#heroIcon');
-            if (m === 'game') {
-                icon.innerHTML = '<rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline>';
-            } else if (m === 'break') {
-                icon.innerHTML = '<path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle>';
-            } else {
-                icon.innerHTML = '<circle cx="12" cy="12" r="10"></circle>';
-            }
-        }
-
-        function infer(scene) { return scene === 'Live Übertragung' ? 'game' : scene && scene !== '—' ? 'break' : 'unknown'; }
-
-        $$('.action-btn').forEach(btn => btn.addEventListener('click', () => {
-            if (mode === 'switching') return;
-            const target = btn.dataset.mode;
-            if (target === mode) return; // Ignore if already active
-            
-            haptic(20);
-            setMode('switching');
-            if (target === 'break') {
-                socket.emit('PauseAction');
-                toast('Switching to break', 'warn');
-            } else {
-                socket.emit('GameAction');
-                toast('Switching to game', 'ok');
-            }
-        }));
-
-        socket.on('currentScene', d => {
-            $$('.scene-chip').forEach(b => b.classList.toggle('on', b.dataset.scene === d.sceneName));
-            $('#heroText').textContent = d.sceneName; // Bold active scene display
-            if (mode !== 'switching') setMode(infer(d.sceneName));
+        document.getElementById('szene2Button').addEventListener('click', () => {
+            socket.emit('transition', { sceneName: 'Szene 2' });
         });
 
-        socket.on('terminalOutput', d => {
-            if (d.includes('completed successfully')) { haptic([10, 30, 10]); toast('Done', 'ok', 1500); setMode(infer($('#heroText').textContent)); }
-            if (d.includes('Failed') || d.includes('failed')) setMode('unknown');
+        document.getElementById('spotiQButton').addEventListener('click', () => {
+            socket.emit('transition', { sceneName: 'Ard' });
         });
 
-        setMode('unknown');
-
-        // ── Faders
-        function updFill(id) {
-            const el = $(`#${id}`), fill = $(`#${id === 'tvFader' ? 'tvFill' : 'spFill'}`);
-            const mn = parseFloat(el.min), mx = parseFloat(el.max), v = parseFloat(el.value);
-            fill.style.width = ((v - mn) / (mx - mn) * 100) + '%';
-        }
-        function updDb(id, val) {
-            const el = $(`#${id}`), v = parseFloat(val);
-            el.textContent = (v >= 0 ? '+' : '') + v.toFixed(1) + ' dB';
-            el.classList.toggle('hot', v > 6);
-        }
-
-        [{ f: 'tvFader', d: 'tvDb', s: 3 }, { f: 'spFader', d: 'spDb', s: 4 }].forEach(({ f, d, s }) => {
-            const el = $(`#${f}`);
-            el.addEventListener('input', () => { socket.emit('setVolume', { stripIndex: s, volume: parseFloat(el.value) }); updDb(d, el.value); updFill(f); });
-            let lt = 0;
-            el.addEventListener('touchend', () => { const n = Date.now(); if (n - lt < 300) { haptic(15); el.value = 0; socket.emit('setVolume', { stripIndex: s, volume: 0 }); updDb(d, 0); updFill(f); } lt = n; });
-            updFill(f);
+        document.getElementById('szene3Button').addEventListener('click', () => {
+            socket.emit('transition', { sceneName: 'Szene 3' });
         });
 
-        // ── Presets & Scenes
-        const presets = { game: { tv: 0, sp: -60 }, break: { tv: -60, sp: 0 }, balanced: { tv: -6, sp: -6 } };
-        $$('.preset-chip').forEach(btn => btn.addEventListener('click', () => {
-            const p = presets[btn.dataset.preset]; if (!p) return; haptic(10);
-            socket.emit('setVolume', { stripIndex: 3, volume: p.tv });
-            socket.emit('setVolume', { stripIndex: 4, volume: p.sp });
-            $('#tvFader').value = p.tv; updDb('tvDb', p.tv); updFill('tvFader');
-            $('#spFader').value = p.sp; updDb('spDb', p.sp); updFill('spFader');
-            toast(`${btn.dataset.preset[0].toUpperCase() + btn.dataset.preset.slice(1)} preset applied`, 'info', 1500);
-        }));
+        function setVolume(stripIndex, volume) {
+            socket.emit('setVolume', { stripIndex, volume });
+        }
 
-        $$('.scene-chip').forEach(b => b.addEventListener('click', () => { haptic(10); socket.emit('transition', { sceneName: b.dataset.scene }); }));
+        function updateVolume(stripIndex, value) {
+            setVolume(stripIndex, value);
+        }
 
-        // ── Drawer
-        function openDrawer() { $('#drawer').classList.add('open'); $('#drawerBg').classList.add('show'); drawerOpen = true; unread = 0; updBadge(); }
-        function closeDrawer() { $('#drawer').classList.remove('open'); $('#drawerBg').classList.remove('show'); drawerOpen = false; }
-        function updBadge() { const b = $('#badge'); if (unread > 0 && !drawerOpen) { b.textContent = unread; b.hidden = false; } else b.hidden = true; }
-        $('#logBtn').onclick = () => { haptic(8); drawerOpen ? closeDrawer() : openDrawer(); };
-        $('#drawerBg').onclick = closeDrawer;
-        $('#clearLog').onclick = () => { $('#log').innerHTML = ''; };
+        function resetSlider(sliderId, value) {
+            document.getElementById(sliderId).value = value;
+        }
 
-        let sy = 0, cy = 0;
-        const grip = $('#drawerGrip');
-        grip.addEventListener('touchstart', e => { sy = e.touches[0].clientY; $('#drawer').style.transition = 'none'; }, { passive: true });
-        grip.addEventListener('touchmove', e => { cy = e.touches[0].clientY; const d = cy - sy; if (d > 0) $('#drawer').style.transform = `translateY(${d}px)`; }, { passive: true });
-        grip.addEventListener('touchend', () => { $('#drawer').style.transition = ''; $('#drawer').style.transform = ''; if (cy - sy > 80) closeDrawer(); sy = 0; cy = 0; });
+        // Automated Action
+        document.getElementById('PauseActionButton').addEventListener('click', () => {
+            socket.emit('PauseAction', {
+                actionName: 'PauseAction',
+                obsScene: 'Szene 2',
+                spotifyVolume: 0,
+                mainVolume: -60
+            });
+        });
 
+        document.getElementById('GameActionButton').addEventListener('click', () => {
+            socket.emit('GameAction', {
+                actionName: 'GameAction',
+                obsScene: 'Ard',
+                spotifyVolume: 0,
+                mainVolume: -60
+            });
+        });
+
+        // Listen for terminal output
         socket.on('terminalOutput', data => {
-            const line = document.createElement('div');
-            line.className = 'log-line';
-            const time = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            let cls = '';
-            if (data.includes('Failed') || data.includes('failed')) cls = 'l-err';
-            else if (data.includes('completed') || data.includes('Connected')) cls = 'l-ok';
-            else if (data.includes('Transitioned') || data.includes('Switched') || data.includes('Faded')) cls = 'l-act';
-            line.innerHTML = `<span class="log-t">${time}</span> <span class="${cls}">${data}</span>`;
-            const log = $('#log');
-            log.appendChild(line);
-            while (log.children.length > 200) log.removeChild(log.firstChild);
-            log.scrollTop = log.scrollHeight;
-            if (!drawerOpen) { unread++; updBadge(); }
+            const terminalOutput = document.getElementById('terminalOutput');
+            terminalOutput.innerHTML += data + '<br>';
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
         });
-    })();
+
+        // Listen for current scene updates
+        socket.on('currentScene', data => {
+            document.getElementById('currentScene').textContent = data.sceneName;
+        });
+
+        // Dark Mode Toggle
+        document.getElementById('darkModeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+        });
     </script>
-    <script src="app.js"></script>
 </body>
 </html>

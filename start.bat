@@ -36,9 +36,9 @@ if exist "C:\Program Files\obs-studio\bin\64bit\obs64.exe" (
 :: Wait for a few seconds to ensure OBS starts properly
 timeout /t 5 /nobreak >nul
 
-:: Start the Node.js server with auto-restart on crash
-echo Starting Node.js server (with crash recovery)...
-start "Euro Studio Server" /b "cmd.exe" /c "node start-server.js"
+:: Start the Node.js server
+echo Starting Node.js server...
+start "" /b "cmd.exe" /c "node server.js"
 
 :: Wait for a few seconds to ensure the server starts properly
 timeout /t 5 /nobreak >nul
