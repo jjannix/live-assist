@@ -48,6 +48,19 @@ obs.on('CurrentProgramSceneChanged', data => {
     console.log('OBS scene changed:', data.sceneName);
     io.emit('currentScene', { sceneName: data.sceneName });
     io.emit('terminalOutput', 'OBS scene changed to: ' + data.sceneName);
+
+    // Auto-load scene profile if one is saved
+    if (vmConnected) {
+        const p = profiles['__scene_' + data.sceneName];
+        if (p) {
+            try {
+                voicemeeter.setStripGain(3, p[3]);
+                voicemeeter.setStripGain(4, p[4]);
+                io.emit('profileLoaded', { name: data.sceneName, gains: p });
+                io.emit('terminalOutput', 'Auto-loaded profile for: ' + data.sceneName);
+            } catch(e) {}
+        }
+    }
 });
 
 obs.on('ConnectionClosed', () => {
@@ -95,6 +108,18 @@ process.on('unhandledRejection', err => {
 
 connectOBSWebSocket();
 connectVoicemeeter();
+
+// ── VU Meter polling (sends levels to all clients every 50ms)
+if (voicemeeter) {
+    setInterval(() => {
+        if (!vmConnected) return;
+        try {
+            const tvLevel = voicemeeter.getLevel(0, 3);  // Strip 3, channel 0 (post-fader)
+            const spLevel = voicemeeter.getLevel(0, 7);  // Strip 4, channel 0 (offset by strips)
+            io.emit('vu', { tv: tvLevel || -60, sp: spLevel || -60 });
+        } catch(e) {}
+    }, 50);
+}
 
 app.use(express.static('public'));
 
@@ -153,11 +178,75 @@ io.on('connection', async socket => {
         try {
             const volume = parseFloat(data.volume);
             voicemeeter.setStripGain(data.stripIndex, volume);
-            console.log('Set volume for virtual input:', data.stripIndex, 'to', volume, 'dB');
             io.emit('terminalOutput', 'Set volume for virtual input: ' + data.stripIndex + ' to ' + volume + ' dB');
         } catch (err) {
             console.error('Failed to set volume for virtual input:', err);
             io.emit('terminalOutput', 'Failed to set volume for virtual input: ' + err.message);
+        }
+    });
+
+    // ── Mute toggle via Voicemeeter
+    socket.on('toggleMute', data => {
+        if (!vmConnected) return;
+        try {
+            const strip = data.stripIndex;
+            const current = voicemeeter.getStripMute(strip);
+            const muted = current === 1;
+            voicemeeter.setStripMute(strip, !muted);
+            const label = strip === 3 ? 'TV' : 'Spotify';
+            io.emit('muteState', { stripIndex: strip, muted: !muted });
+            io.emit('terminalOutput', (muted ? 'Unmuted' : 'Muted') + ' ' + label);
+        } catch (err) {
+            console.error('Failed to toggle mute:', err);
+        }
+    });
+
+    // ── Save / Load audio profiles
+    const profiles = {};  // { profileName: { 3: -1.2, 4: -6.5 } }
+
+    socket.on('saveProfile', data => {
+        if (!vmConnected) return;
+        try {
+            const name = data.name;
+            const strip3 = voicemeeter.getStripGain(3);
+            const strip4 = voicemeeter.getStripGain(4);
+            profiles[name] = { 3: strip3, 4: strip4 };
+            socket.emit('profileSaved', { name, gains: profiles[name] });
+            io.emit('terminalOutput', 'Saved profile: ' + name);
+        } catch (err) {
+            console.error('Failed to save profile:', err);
+        }
+    });
+
+    socket.on('loadProfile', data => {
+        if (!vmConnected) return;
+        const p = profiles[data.name];
+        if (!p) return;
+        try {
+            voicemeeter.setStripGain(3, p[3]);
+            voicemeeter.setStripGain(4, p[4]);
+            io.emit('profileLoaded', { name: data.name, gains: p });
+            io.emit('terminalOutput', 'Loaded profile: ' + data.name);
+        } catch (err) {
+            console.error('Failed to load profile:', err);
+        }
+    });
+
+    socket.on('getProfiles', () => {
+        socket.emit('profileList', profiles);
+    });
+
+    // ── Per-scene auto-profiles
+    socket.on('saveSceneProfile', data => {
+        if (!vmConnected) return;
+        try {
+            const name = data.sceneName;
+            const strip3 = voicemeeter.getStripGain(3);
+            const strip4 = voicemeeter.getStripGain(4);
+            profiles['__scene_' + name] = { 3: strip3, 4: strip4 };
+            io.emit('terminalOutput', 'Saved scene profile: ' + name);
+        } catch (err) {
+            console.error('Failed to save scene profile:', err);
         }
     });
 
