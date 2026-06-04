@@ -95,4 +95,4 @@ function buildChannelMapFromEnv() {
     return map;
 }
 
-module.exports = { createBackend, NullBackend };
+module.exports = { createBackend, buildChannelMapFromEnv, NullBackend };

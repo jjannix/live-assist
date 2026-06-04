@@ -141,6 +141,7 @@ if (audioBackend.setLogger) {
 }
 
 async function initAudio() {
+    const chosenBackend = (process.env.AUDIO_BACKEND || 'auto').toLowerCase().trim();
     const caps = audioBackend.getCapabilities();
     log(`Audio backend: ${audioBackend.name} ` +
         `(perChannelVolume=${caps.perChannelVolume}, mute=${caps.mute}, fade=${caps.fade}, profiles=${caps.profiles})`);
@@ -150,7 +151,31 @@ async function initAudio() {
         log(`Audio backend "${audioBackend.name}" connected`);
     } catch (e) {
         log(`Audio backend "${audioBackend.name}" init failed: ${e.message}`);
-        log('Audio controls will be limited — scene switching still works');
+
+        // In auto mode with VM backend, fall back to windows-simple
+        if (chosenBackend === 'auto' && audioBackend.name === 'voicemeeter') {
+            log('Falling back to windows-simple backend…');
+            try {
+                const { WindowsSimpleBackend } = require('./audio/windows-simple-backend');
+                const { buildChannelMapFromEnv } = require('./audio/factory');
+                audioBackend = new WindowsSimpleBackend(buildChannelMapFromEnv());
+                // Re-register status callback and logger
+                audioBackend.onStatusChange((connected, detail) => {
+                    io.emit('vmStatus', { connected });
+                    if (detail) io.emit('terminalOutput', detail);
+                });
+                if (audioBackend.setLogger) {
+                    audioBackend.setLogger(msg => { if (AUDIO_DEBUG) console.log('[audio] ' + msg); });
+                }
+                await audioBackend.init();
+                log(`Fallback audio backend "${audioBackend.name}" connected`);
+            } catch (e2) {
+                log(`Fallback to windows-simple also failed: ${e2.message}`);
+                log('Audio controls will be limited — scene switching still works');
+            }
+        } else {
+            log('Audio controls will be limited — scene switching still works');
+        }
     }
 }
 
