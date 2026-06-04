@@ -91,6 +91,18 @@ async function connectVoicemeeter() {
         console.log('Connected to Voicemeeter');
         io.emit('vmStatus', { connected: true });
         io.emit('terminalOutput', 'Connected to Voicemeeter');
+
+        // Read initial mute state from Voicemeeter
+        try {
+            const tvMuted = voicemeeter.getStripMute(3) !== 0;
+            const spMuted = voicemeeter.getStripMute(4) !== 0;
+            muteState[3] = tvMuted;
+            muteState[4] = spMuted;
+            io.emit('muteState', { stripIndex: 3, muted: tvMuted });
+            io.emit('muteState', { stripIndex: 4, muted: spMuted });
+        } catch(e) {
+            console.error('Failed to read initial mute state:', e.message || e);
+        }
     } catch (err) {
         vmConnected = false;
         console.error('Failed to connect to Voicemeeter:', err && err.message ? err.message : err);
@@ -121,6 +133,12 @@ io.on('connection', async socket => {
         socket.emit('obsStatus', { connected: true });
     } catch (err) {
         socket.emit('obsStatus', { connected: false });
+    }
+
+    // Send current mute state to newly connected client
+    if (vmConnected) {
+        socket.emit('muteState', { stripIndex: 3, muted: muteState[3] });
+        socket.emit('muteState', { stripIndex: 4, muted: muteState[4] });
     }
 
     socket.on('transition', async data => {
