@@ -174,22 +174,15 @@ io.on('connection', async socket => {
                 const fadeSteps = 60;
                 const stepDuration = 15; // ms
 
-                // Step 1: Fade out Spotify Input (Strip 4)
-                io.emit('terminalOutput', 'Starting to fade out Spotify Input.');
+                io.emit('terminalOutput', 'Fading audio.');
                 for (let i = 0; i <= fadeSteps; i++) {
                     const progress = i / fadeSteps;
-                    const spotifyInputGain = Math.round(-60 * progress + spTarget * (1 - progress));
-                    try { voicemeeter.setStripGain(4, spotifyInputGain); } catch(e) {}
-                    await new Promise(resolve => setTimeout(resolve, stepDuration));
-                }
-                io.emit('terminalOutput', 'Spotify Input faded out.');
-
-                // Step 2: Fade in Main Input (Strip 3) to user's level
-                io.emit('terminalOutput', 'Fading in Main Input for OBS transition.');
-                for (let i = 0; i <= fadeSteps; i++) {
-                    const progress = i / fadeSteps;
-                    const mainInputGain = Math.round(-60 * (1 - progress) + tvTarget * progress);
-                    try { voicemeeter.setStripGain(3, mainInputGain); } catch(e) {}
+                    const tvGain = Math.round(-60 * (1 - progress) + tvTarget * progress);
+                    const spGain = Math.round(-60 * progress + spTarget * (1 - progress));
+                    try {
+                        voicemeeter.setStripGain(3, tvGain);
+                        voicemeeter.setStripGain(4, spGain);
+                    } catch(e) {}
                     await new Promise(resolve => setTimeout(resolve, stepDuration));
                 }
             } else {
@@ -198,12 +191,16 @@ io.on('connection', async socket => {
 
             io.emit('terminalOutput', 'Automated action completed successfully.');
             io.emit('actionDone', 'game');
+        } catch (err) {
+            console.error('Automated action (GameAction) failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
             io.emit('actionFailed');
         }
-    });', async data => {
+    });
+
+    socket.on('PauseAction', async data => {
         try {
-            const tvTarget = data && data.tvTarget !== undefined ? data.tvTarget : -60;
+            // Break: TV goes silent (-60), Spotify fades to user's level
             const spTarget = data && data.spTarget !== undefined ? data.spTarget : 0;
 
             // Switch OBS scene first for instant visual feedback
@@ -216,7 +213,7 @@ io.on('connection', async socket => {
 
                 for (let i = 0; i <= fadeSteps; i++) {
                     const progress = i / fadeSteps;
-                    const mainInputGain = Math.round(tvTarget * progress + (-60) * (1 - progress));
+                    const mainInputGain = Math.round(-60 * progress);
                     const spotifyInputGain = Math.round(spTarget * progress + (-60) * (1 - progress));
 
                     try {
@@ -234,8 +231,14 @@ io.on('connection', async socket => {
 
             io.emit('terminalOutput', 'Automated action completed successfully.');
             io.emit('actionDone', 'break');
+        } catch (err) {
+            console.error('Automated action (PauseAction) failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
-            io.emit('actionFailed');, () => {
+            io.emit('actionFailed');
+        }
+    });
+
+    socket.on('disconnect', () => {
         console.log('Client disconnected');
         io.emit('terminalOutput', 'Client disconnected');
     });
