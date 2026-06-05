@@ -88,14 +88,22 @@ public class CoreAudio {
     public static void InvalidateCache() {
         if (cachedManager != null) { Marshal.ReleaseComObject(cachedManager); cachedManager = null; }
         if (cachedManagerIUnknown != IntPtr.Zero) { Marshal.Release(cachedManagerIUnknown); cachedManagerIUnknown = IntPtr.Zero; }
+        detectedPidSlot = -1;  // re-probe on next use
     }
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DGetCount(IntPtr self, out int count);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DGetSession(IntPtr self, int index, out IntPtr session);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DGetPid(IntPtr self, out uint pid);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DGetVol(IntPtr self, out float level);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DSetVol(IntPtr self, float level, ref Guid ctx);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DGetMute(IntPtr self, out int mute);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     delegate int DSetMute(IntPtr self, int mute, ref Guid ctx);
 
     static IntPtr Vtbl(IntPtr obj, int slot) {
@@ -105,6 +113,48 @@ public class CoreAudio {
     static T D<T>(IntPtr obj, int slot) where T : class {
         return (T)(object)Marshal.GetDelegateForFunctionPointer(Vtbl(obj, slot), typeof(T));
     }
+
+    // ── GetProcessId vtable slot detection ─────────────────────────
+    // Standard IAudioSessionControl2 has GetProcessId at vtable slot 11
+    // (IUnknown:3 + IAudioSessionControl:8). Some Windows builds (e.g.
+    // Win10 24H2) have inserted 1-3 extra methods into the session
+    // control vtable (IAudioSessionControl3 / private extensions),
+    // shifting GetProcessId to a higher slot. We probe a range and pick
+    // the slot whose return value looks like a real PID.
+    //
+    // CSE (AccessViolationException) is allowed via attribute so a bad
+    // slot doesn't crash the entire sidecar.
+    static int detectedPidSlot = -1;
+
+    [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptions]
+    static int DetectPidSlot(IntPtr sp) {
+        if (detectedPidSlot >= 0) return detectedPidSlot;
+        int probeStart = 3, probeEnd = 16;
+        for (int slot = probeStart; slot <= probeEnd; slot++) {
+            try {
+                uint pid;
+                int hr = D<DGetPid>(sp, slot)(sp, out pid);
+                if (hr == 0 && pid > 0 && pid < 1000000) {
+                    detectedPidSlot = slot;
+                    return slot;
+                }
+            } catch {}
+        }
+        return -1;
+    }
+
+    [System.Runtime.ExceptionServices.HandleProcessCorruptedStateExceptions]
+    static uint SafeGetPid(IntPtr sp) {
+        if (detectedPidSlot < 0) DetectPidSlot(sp);
+        if (detectedPidSlot < 0) return 0;
+        try {
+            uint pid;
+            int hr = D<DGetPid>(sp, detectedPidSlot)(sp, out pid);
+            return (hr == 0) ? pid : 0;
+        } catch { return 0; }
+    }
+
+    public static int GetDetectedPidSlot() { return detectedPidSlot; }
 
     public static List<SessionInfo> GetSessions() {
         var result = new List<SessionInfo>();
@@ -117,8 +167,7 @@ public class CoreAudio {
                 IntPtr sp;
                 if (D<DGetSession>(se, 4)(se, i, out sp) != 0) continue;
                 try {
-                    uint pid = 0;
-                    try { D<DGetPid>(sp, 11)(sp, out pid); } catch {}
+                    uint pid = SafeGetPid(sp);
                     string nm = "";
                     if (pid > 0) { try { nm = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant(); } catch {} }
                     IntPtr vp;
@@ -148,8 +197,7 @@ public class CoreAudio {
                 IntPtr sp;
                 if (D<DGetSession>(se, 4)(se, i, out sp) != 0) continue;
                 try {
-                    uint pid = 0;
-                    try { D<DGetPid>(sp, 11)(sp, out pid); } catch {}
+                    uint pid = SafeGetPid(sp);
                     string nm = "";
                     if (pid > 0) { try { nm = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant(); } catch {} }
                     if (nm == processNameLower) {
