@@ -1,19 +1,41 @@
 # Euro Studio
 
-A unified control panel for live European sports broadcasts on OBS. One-click scene switching, per-app volume faders, mute toggles, audio profiles, and a live activity log — all from a phone or tablet on the same network.
+Wireless control for OBS in public-viewing setups. A laptop runs OBS to a beamer and speakers — Euro Studio lets a phone or tablet switch scenes and adjust audio over WiFi, so one person can focus on the game while another runs the show.
 
-Built for the case where you're streaming, both hands are on the controller, and a friend needs to switch scenes or nudge audio without interrupting you.
+Built for the case where you're streaming a match, both hands are on the controller, and a friend needs to switch from live feed to halftime music or tweak the volume for the room.
 
 ## What it does
 
-- **Scene switching** — `Live Übertragung` (game), `Spotify` (break), `Zen` (idle) — assigned to OBS scenes
-- **Audio faders** — per-app volume control (OBS, Spotify, Chrome, etc.) via Windows Core Audio
-- **Mute toggles** — one-tap mute for each audio channel
-- **Smooth fades** — slider movements ramp volume over 900ms instead of jumping
-- **Auto-profiles** — switch audio settings automatically when scenes change (e.g. lower game audio when going to break)
-- **Live terminal** — every action logged in-app with timestamps
-- **Multi-device** — phone, tablet, laptop, all in parallel
-- **PWA** — install as a web app on iOS / Android home screen
+- **Scene switching** — `Live Übertragung` (match), `Spotify` (halftime), `Zen` (idle) — picked from your phone
+- **Per-app audio faders** — separate volume for the game feed, music player, browser, etc.
+- **Mute toggles** — one-tap silence for each channel
+- **Smooth fades** — slider movements ramp volume over ~1 second, no jump-cuts
+- **Auto-profiles** — audio settings follow scenes (e.g. lower game audio automatically when switching to halftime)
+- **Live activity log** — every action timestamped and visible in-app
+- **PWA** — install on iOS / Android home screen, runs fullscreen
+- **Multi-device** — phone, tablet, laptop can all be controllers in parallel
+
+## Use case
+
+Typical setup:
+
+```
+  Beamer ──── HDMI ───► Laptop (OBS Studio)
+                              │
+                              │ speakers/PA
+                              ▼
+                         Audio out
+                              ▲
+                              │ WiFi
+                              │
+                       Phone / Tablet
+                       (Euro Studio)
+```
+
+- OBS runs fullscreen preview to the beamer
+- Audio goes to the room's speakers
+- A separate person operates Euro Studio on a phone, switching scenes and audio without touching the laptop
+- No mouse, no keyboard, no display needed on the controlling device
 
 ## Quick start
 
@@ -23,7 +45,7 @@ Built for the case where you're streaming, both hands are on the controller, and
 start.bat
 ```
 
-That's it. Installs deps, copies `.env.example` to `.env` if missing, starts the server.
+Installs deps, copies `.env.example` to `.env` if missing, starts the server.
 
 ### Manual
 
@@ -34,7 +56,7 @@ cp .env.example .env
 node server.js
 ```
 
-Then open `http://localhost:3000` on the main PC, or scan the network IP shown in the terminal to open it on a phone/tablet.
+Open `http://localhost:3000` on the main PC, or use the network IP printed at startup to open it on the controlling phone/tablet.
 
 ## Setup
 
@@ -43,6 +65,7 @@ Then open `http://localhost:3000` on the main PC, or scan the network IP shown i
 1. **Tools → WebSocket Server Settings → Enable WebSocket server** (OBS 28+)
 2. Copy the password into `OBS_WEBSOCKET_PASSWORD` in `.env`
 3. Default URL is `ws://localhost:4455`
+4. Set the OBS scene you want on the beamer as **fullscreen preview** (right-click the preview → Fullscreen Projector)
 
 ### Scenes
 
@@ -50,18 +73,24 @@ Edit `SCENES` in `.env`. The defaults are:
 ```
 SCENES=Live Übertragung,Spotify,Zen
 ```
-Names must match OBS exactly.
+Names must match your OBS scenes exactly. Typical setup:
+
+| OBS scene | Purpose |
+|-----------|---------|
+| `Live Übertragung` | The match feed (game source on fullscreen) |
+| `Spotify` | Halftime / breaks — music, no game |
+| `Zen` | Idle / pre-game — logos, attract loop |
 
 ### Audio channels
 
-Euro Studio treats apps as two logical channels:
+Euro Studio maps two logical channels onto apps running on the laptop:
 
-| Channel | Default apps | Maps to OBS source |
-|---------|-------------|-------------------|
-| **3** — TV | `obs64.exe, chrome.exe` | The broadcast |
-| **4** — Spotify | `spotify.exe` | The break music |
+| Channel | Default apps | Role |
+|---------|-------------|------|
+| **3** — TV | `obs64.exe, chrome.exe` | Anything producing the broadcast audio |
+| **4** — Spotify | `spotify.exe` | The halftime music |
 
-Change with `AUDIO_CHANNEL_3_APPS` and `AUDIO_CHANNEL_4_APPS` in `.env`. Use process names without `.exe`.
+These are arbitrary — change them with `AUDIO_CHANNEL_3_APPS` and `AUDIO_CHANNEL_4_APPS` in `.env`. Use process names without `.exe`. Apps not running report as silent rather than erroring.
 
 ## Network access
 
@@ -69,19 +98,21 @@ The server binds to `0.0.0.0:3000` by default, so any device on the same network
 
 | Network | Works? | Notes |
 |---------|--------|-------|
-| Same WiFi (home / office) | ✓ | Phone and PC on same router |
+| Home / office WiFi | ✓ | Phone and PC on same router |
 | **Eduroam / public WiFi** | ✗ | Client isolation blocks device-to-device |
 | **Eduroam + Windows Hotspot** | ✓ | See below |
 
 ### Eduroam workaround
 
-Eduroam isolates clients — your phone can't reach the PC even on the same SSID. The fix is to use Windows Mobile Hotspot on a **dual-band** WiFi adapter:
+Eduroam (and most public / campus WiFi) isolates clients — your phone can't reach the laptop even on the same SSID. The fix is to use **Windows Mobile Hotspot** on a **dual-band** WiFi adapter:
 
-1. PC stays on Eduroam (5 GHz) for the OBS stream
-2. PC broadcasts a personal hotspot (2.4 GHz) for the phone
+1. Laptop stays on Eduroam (5 GHz) for internet and OBS
+2. Laptop broadcasts a personal hotspot (2.4 GHz) for the phone
 3. Phone connects to the hotspot, opens `http://<hotspot-ip>:3000`
 
-The startup log prints every reachable IPv4 address — pick the one that matches the hotspot's range (usually `192.168.137.x`).
+The startup log prints every reachable IPv4 address — pick the one matching the hotspot range (usually `192.168.137.x`).
+
+If your WiFi card doesn't support simultaneous client + AP, plug in a cheap USB WiFi dongle and use that for the hotspot.
 
 ## Configuration
 
@@ -94,29 +125,21 @@ All settings live in `.env`. See `.env.example` for the full annotated reference
 | `OBS_WEBSOCKET_URL` | `ws://localhost:4455` | OBS WebSocket endpoint |
 | `OBS_WEBSOCKET_PASSWORD` | — | OBS WebSocket password |
 | `AUDIO_BACKEND` | `auto` | `auto`, `voicemeeter`, `windows-simple`, or `none` |
-| `AUDIO_CHANNEL_3_APPS` | `obs64.exe,chrome.exe` | Apps in logical channel 3 (TV) |
-| `AUDIO_CHANNEL_4_APPS` | `spotify.exe` | Apps in logical channel 4 (Spotify) |
+| `AUDIO_CHANNEL_3_APPS` | `obs64,chrome` | Apps in logical channel 3 |
+| `AUDIO_CHANNEL_4_APPS` | `spotify` | Apps in logical channel 4 |
 | `SCENES` | `Live Übertragung,Spotify,Zen` | OBS scene names, comma-separated |
 | `AUDIO_FADE_DURATION_MS` | `900` | Volume ramp time |
 | `AUDIO_DEBUG` | `0` | Set to `1` for verbose audio logs |
 
 ## Audio backends
 
-Euro Studio abstracts audio behind a pluggable backend (`audio/interface.js`). Three options:
+Euro Studio abstracts audio behind a pluggable backend (`audio/interface.js`).
 
-### `voicemeeter` (default for power users)
+- **`voicemeeter`** — full control via Voicemeeter. Per-strip volume, mute, profiles, auto-profiles. Requires Voicemeeter installed and running.
+- **`windows-simple`** — per-app volume via Windows Core Audio. No extra software. Profiles not supported.
+- **`none`** — disables audio. Scene switching still works.
 
-Full control via Voicemeeter. Supports per-strip volume, mute, profiles, and auto-profiles. Requires Voicemeeter installed and running.
-
-### `windows-simple` (no Voicemeeter)
-
-Per-app volume via Windows Core Audio. No extra software. Apps not running simply report as silent. Profiles not supported.
-
-### `none`
-
-Disables all audio. Scene switching still works.
-
-The `auto` mode tries Voicemeeter first, then falls back to `windows-simple`.
+`auto` tries Voicemeeter first, falls back to `windows-simple`.
 
 ## File structure
 
@@ -135,17 +158,19 @@ The `auto` mode tries Voicemeeter first, then falls back to `windows-simple`.
 │   └── service-worker.js
 ├── audio/                     # Audio backend abstraction
 │   ├── interface.js           # Base AudioBackend class
-│   ├── voicemeeter-backend.js # Voicemeeter implementation
-│   ├── windows-simple-backend.js  # Windows Core Audio
-│   ├── factory.js             # createBackend()
+│   ├── voicemeeter-backend.js
+│   ├── windows-simple-backend.js
+│   ├── factory.js
 │   └── sidecar-coreaudio.cs   # C# COM interop for windows-simple
 └── scripts/                   # Utility scripts
 ```
 
 ## PWA install
 
-On iPhone: Safari → Share → **Add to Home Screen**
-On Android: Chrome → menu → **Install app**
+- **iPhone**: Safari → Share → **Add to Home Screen**
+- **Android**: Chrome → menu → **Install app**
+
+Once installed it launches fullscreen, no browser chrome.
 
 ## License
 
