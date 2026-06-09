@@ -1,6 +1,6 @@
 {
-    "name": "Euros Studio",
-    "short_name": "Euros",
+    "name": "jnk Live Assist",
+    "short_name": "Live Assist",
     "description": "Broadcast control panel for OBS & Voicemeeter",
     "start_url": "/",
     "display": "standalone",

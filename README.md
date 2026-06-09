@@ -1,6 +1,6 @@
-# Euro Studio
+# jnk Live Assist
 
-Wireless control for OBS in public-viewing setups. A laptop runs OBS to a beamer and speakers — Euro Studio lets a phone or tablet switch scenes and adjust audio over WiFi, so one person can focus on the game while another runs the show.
+Wireless control for OBS in public-viewing setups. A laptop runs OBS to a beamer and speakers — jnk Live Assist lets a phone or tablet switch scenes and adjust audio over WiFi, so one person can focus on the game while another runs the show.
 
 Built for the case where you're streaming a match, both hands are on the controller, and a friend needs to switch from live feed to halftime music or tweak the volume for the room.
 
@@ -29,12 +29,12 @@ Typical setup:
                               │ WiFi
                               │
                        Phone / Tablet
-                       (Euro Studio)
+                       (Live Assist)
 ```
 
 - OBS runs fullscreen preview to the beamer
 - Audio goes to the room's speakers
-- A separate person operates Euro Studio on a phone, switching scenes and audio without touching the laptop
+- A separate person operates jnk Live Assist on a phone, switching scenes and audio without touching the laptop
 - No mouse, no keyboard, no display needed on the controlling device
 
 ## Quick start
@@ -83,7 +83,7 @@ Names must match your OBS scenes exactly. Typical setup:
 
 ### Audio channels
 
-Euro Studio maps two logical channels onto apps running on the laptop:
+jnk Live Assist maps two logical channels onto apps running on the laptop:
 
 | Channel | Default apps | Role |
 |---------|-------------|------|
@@ -133,7 +133,7 @@ All settings live in `.env`. See `.env.example` for the full annotated reference
 
 ## Audio backends
 
-Euro Studio abstracts audio behind a pluggable backend (`audio/interface.js`).
+jnk Live Assist abstracts audio behind a pluggable backend (`audio/interface.js`).
 
 - **`voicemeeter`** — full control via Voicemeeter. Per-strip volume, mute, profiles, auto-profiles. Requires Voicemeeter installed and running.
 - **`windows-simple`** — per-app volume via Windows Core Audio. No extra software. Profiles not supported.
