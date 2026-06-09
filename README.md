@@ -60,6 +60,19 @@ Open `http://localhost:3000` on the main PC, or use the network IP printed at st
 
 ## Setup
 
+### Node.js
+
+The `native` audio backend uses `native-sound-mixer`, which currently only ships an **x64** prebuilt. On **Windows arm64** (Surface Pro X, Snapdragon X Elite, etc.) you must run an **x64** Node.js — Windows on arm64 emulates it natively.
+
+| Workflow | How to get x64 |
+|----------|---------------|
+| Production launcher (`start.bat`) | Auto-detects the system x64 Node at `C:\Program Files\nodejs\` and refuses to start on arm64 |
+| **Dev (any terminal)** | `dev.cmd node server.js` / `dev.cmd nodemon server.js` — prepends the x64 Node to PATH and forwards the rest of the command line |
+| **Dev (VS Code)** | `.vscode/settings.json` sets `FNM_ARCH=x64` in the integrated terminal only, no global change |
+| Manual | `& "C:\Program Files\nodejs\node.exe" server.js` |
+
+If you use fnm with `--arch=arm64` in your global profile, leave it alone — the per-project options above override it just for this workspace.
+
 ### OBS
 
 1. **Tools → WebSocket Server Settings → Enable WebSocket server** (OBS 28+)
@@ -87,10 +100,12 @@ jnk Live Assist maps two logical channels onto apps running on the laptop:
 
 | Channel | Default apps | Role |
 |---------|-------------|------|
-| **3** — TV | `obs64.exe, chrome.exe` | Anything producing the broadcast audio |
+| **3** — TV | `obs64.exe, chrome.exe, firefox.exe, msedge.exe, discord.exe` | Anything producing the broadcast audio (browser stream, game, comms, OBS monitor) |
 | **4** — Spotify | `spotify.exe` | The halftime music |
 
 These are arbitrary — change them with `AUDIO_CHANNEL_3_APPS` and `AUDIO_CHANNEL_4_APPS` in `.env`. Use process names without `.exe`. Apps not running report as silent rather than erroring.
+
+**How it works without Voicemeeter:** the `native` backend uses `native-sound-mixer` to talk to the Windows Core Audio API. Each listed app's master volume is set directly in Windows. If OBS is capturing the system default audio device (via the *Desktop-Audio* source), the broadcast mix tracks those per-app levels automatically — lower Spotify in Windows → less Spotify in the broadcast.
 
 ## Network access
 
@@ -124,7 +139,7 @@ All settings live in `.env`. See `.env.example` for the full annotated reference
 | `PORT` | `3000` | HTTP port |
 | `OBS_WEBSOCKET_URL` | `ws://localhost:4455` | OBS WebSocket endpoint |
 | `OBS_WEBSOCKET_PASSWORD` | — | OBS WebSocket password |
-| `AUDIO_BACKEND` | `auto` | `auto`, `voicemeeter`, `windows-simple`, or `none` |
+| `AUDIO_BACKEND` | `auto` | `auto`, `voicemeeter`, `native`, or `none` |
 | `AUDIO_CHANNEL_3_APPS` | `obs64,chrome` | Apps in logical channel 3 |
 | `AUDIO_CHANNEL_4_APPS` | `spotify` | Apps in logical channel 4 |
 | `SCENES` | `Live Übertragung,Spotify,Zen` | OBS scene names, comma-separated |
@@ -136,10 +151,12 @@ All settings live in `.env`. See `.env.example` for the full annotated reference
 jnk Live Assist abstracts audio behind a pluggable backend (`audio/interface.js`).
 
 - **`voicemeeter`** — full control via Voicemeeter. Per-strip volume, mute, profiles, auto-profiles. Requires Voicemeeter installed and running.
-- **`windows-simple`** — per-app volume via Windows Core Audio. No extra software. Profiles not supported.
+- **`native`** *(default for users without Voicemeeter)* — per-app volume via Windows Core Audio through the `native-sound-mixer` native addon. No extra software, just `node server.js`. Profiles and per-scene auto-profiles are not supported (the faders themselves work the same).
 - **`none`** — disables audio. Scene switching still works.
 
-`auto` tries Voicemeeter first, falls back to `windows-simple`.
+`auto` tries Voicemeeter first; if it's not installed or fails to connect, it falls back to `native`; if neither is available, audio is disabled but the rest of the app keeps working.
+
+Pick a backend explicitly with `AUDIO_BACKEND=voicemeeter|native|none` in `.env`. The status pill in the top-right shows which one is active: `VM` (Voicemeeter), `APP` (native), `OFF` (none).
 
 ## File structure
 
@@ -156,13 +173,12 @@ jnk Live Assist abstracts audio behind a pluggable backend (`audio/interface.js`
 │   ├── style.css
 │   ├── manifest.json
 │   └── service-worker.js
-├── audio/                     # Audio backend abstraction
-│   ├── interface.js           # Base AudioBackend class
-│   ├── voicemeeter-backend.js
-│   ├── windows-simple-backend.js
-│   ├── factory.js
-│   └── sidecar-coreaudio.cs   # C# COM interop for windows-simple
-└── scripts/                   # Utility scripts
+└── audio/                     # Audio backend abstraction
+    ├── interface.js           # Base AudioBackend class
+    ├── conversions.js         # dB ↔ scalar helpers
+    ├── voicemeeter-backend.js # VoicemeeterRemote wrapper
+    ├── native-backend.js      # native-sound-mixer (per-app volume)
+    └── factory.js             # auto/voicemeeter/native/none picker
 ```
 
 ## PWA install
