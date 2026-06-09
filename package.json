@@ -10,7 +10,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^4.19.2",
+    "native-sound-mixer": "^3.4.6-win",
     "obs-websocket-js": "^5.0.5",
     "socket.io": "^4.7.5",
     "vban": "^1.2.5",

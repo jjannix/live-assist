@@ -3,9 +3,9 @@ const http = require('http');
 const os = require('os');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
-let voicemeeter;
-try { voicemeeter = require('voicemeeter-remote'); } catch (e) { console.log('Voicemeeter module not available'); }
 const dotenv = require('dotenv');
+
+const { createBackend, NullBackend } = require('./audio/factory');
 
 dotenv.config();
 
@@ -16,23 +16,13 @@ const obs = new OBSWebSocket();
 
 const serverStartTime = Date.now();
 
-// ── Auto-reconnect state & helpers
+// ── OBS auto-reconnect state ──────────────────────────────────────
 const RECONNECT_INITIAL_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
-const VM_HEALTH_CHECK_MS = 30000;
-
-// Strip index used by the periodic VM health probe. Defaults to 3 (TV Broadcast
-// in the project's standard layout). Override via VM_HEALTH_PROBE_STRIP if your
-// layout differs — must be a non-negative integer.
-const vmHealthProbeRaw = parseInt(process.env.VM_HEALTH_PROBE_STRIP, 10);
-const VM_HEALTH_PROBE_STRIP = Number.isInteger(vmHealthProbeRaw) && vmHealthProbeRaw >= 0 ? vmHealthProbeRaw : 3;
 
 let shuttingDown = false;
 let obsReconnectAttempt = 0;
 let obsReconnectTimer = null;
-let vmReconnectAttempt = 0;
-let vmReconnectTimer = null;
-let vmHealthCheckTimer = null;
 
 function reconnectDelay(attempt) {
     return Math.min(RECONNECT_INITIAL_MS * Math.pow(2, attempt), RECONNECT_MAX_MS);
@@ -40,11 +30,6 @@ function reconnectDelay(attempt) {
 
 function setObsStatus(connected, detail = '') {
     io.emit('obsStatus', { connected });
-    if (detail) io.emit('terminalOutput', detail);
-}
-
-function setVmStatus(connected, detail = '') {
-    io.emit('vmStatus', { connected });
     if (detail) io.emit('terminalOutput', detail);
 }
 
@@ -56,40 +41,6 @@ function scheduleOBSReconnect() {
         obsReconnectTimer = null;
         connectOBSWebSocket();
     }, delay);
-}
-
-function scheduleVMReconnect() {
-    if (shuttingDown || vmReconnectTimer || !voicemeeter) return;
-    const delay = reconnectDelay(vmReconnectAttempt);
-    io.emit('terminalOutput', `Voicemeeter: retrying in ${(delay / 1000).toFixed(1)}s (after attempt ${vmReconnectAttempt})…`);
-    vmReconnectTimer = setTimeout(async () => {
-        vmReconnectTimer = null;
-        await connectVoicemeeter();
-    }, delay);
-}
-
-function startVMHealthCheck() {
-    if (vmHealthCheckTimer || !voicemeeter) return;
-    console.log(`VM health check: probing strip ${VM_HEALTH_PROBE_STRIP} every ${VM_HEALTH_CHECK_MS / 1000}s`);
-    vmHealthCheckTimer = setInterval(() => {
-        if (!vmConnected) return;
-        try {
-            voicemeeter.getStripGain(VM_HEALTH_PROBE_STRIP);
-        } catch (err) {
-            console.error('VM health check failed:', err && err.message ? err.message : err);
-            vmConnected = false;
-            stopVMHealthCheck();
-            setVmStatus(false, 'Voicemeeter connection lost');
-            scheduleVMReconnect();
-        }
-    }, VM_HEALTH_CHECK_MS);
-}
-
-function stopVMHealthCheck() {
-    if (vmHealthCheckTimer) {
-        clearInterval(vmHealthCheckTimer);
-        vmHealthCheckTimer = null;
-    }
 }
 
 async function connectOBSWebSocket() {
@@ -104,17 +55,12 @@ async function connectOBSWebSocket() {
 
         const { scenes } = await obs.call('GetSceneList');
         console.log('Available scenes:');
-        scenes.forEach(scene => {
-            console.log(scene.name);
-        });
+        scenes.forEach(scene => console.log(scene.sceneName));
 
         const sources = await obs.call('GetInputList');
         console.log('Available audio sources:');
-        sources.inputs.forEach(source => {
-            console.log(source.inputName);
-        });
+        sources.inputs.forEach(source => console.log(source.inputName));
 
-        // Emit the current scene to clients
         const currentScene = await obs.call('GetCurrentProgramScene');
         io.emit('currentScene', { sceneName: currentScene.currentProgramSceneName });
     } catch (err) {
@@ -124,23 +70,18 @@ async function connectOBSWebSocket() {
     }
 }
 
-// Listen for OBS scene changes (e.g. someone switches directly in OBS)
+// Listen for OBS scene changes
 obs.on('CurrentProgramSceneChanged', data => {
     console.log('OBS scene changed:', data.sceneName);
     io.emit('currentScene', { sceneName: data.sceneName });
     io.emit('terminalOutput', 'OBS scene changed to: ' + data.sceneName);
 
     // Auto-load scene profile if one is saved
-    if (vmConnected) {
-        const p = profiles['__scene_' + data.sceneName];
-        if (p) {
-            try {
-                voicemeeter.setStripGain(3, p[3]);
-                voicemeeter.setStripGain(4, p[4]);
-                io.emit('profileLoaded', { name: data.sceneName, gains: p });
-                io.emit('terminalOutput', 'Auto-loaded profile for: ' + data.sceneName);
-            } catch(e) {}
-        }
+    const p = profiles['__scene_' + data.sceneName];
+    if (p && audioBackend.isConnected()) {
+        audioBackend.setMultiChannelGain({ 3: p[3], 4: p[4] });
+        io.emit('profileLoaded', { name: data.sceneName, gains: p });
+        io.emit('terminalOutput', 'Auto-loaded profile for: ' + data.sceneName);
     }
 });
 
@@ -156,58 +97,63 @@ obs.on('ConnectionError', err => {
     scheduleOBSReconnect();
 });
 
-let vmConnected = false;
-const muteState = { 3: false, 4: false };
+// ── Audio backend setup ───────────────────────────────────────────
+const AUDIO_FADE_DURATION_MS = parseInt(process.env.AUDIO_FADE_DURATION_MS, 10) || 900;
+const AUDIO_DEBUG = ['true', '1', 'yes'].includes((process.env.AUDIO_DEBUG || '').toLowerCase());
+const AUDIO_LOG_PREFIX = '[audio] ';
 
-async function connectVoicemeeter() {
-    if (!voicemeeter) {
-        console.log('Voicemeeter module not loaded — skipping');
-        io.emit('vmStatus', { connected: false });
-        io.emit('terminalOutput', 'Voicemeeter not available — audio controls disabled');
-        return;
-    }
-    vmReconnectAttempt++;
-    const attempt = vmReconnectAttempt;
-    io.emit('terminalOutput', `Voicemeeter: connecting (attempt ${attempt})…`);
+function audioLog(msg) {
+    const line = AUDIO_LOG_PREFIX + msg;
+    console.log(line);
+    if (AUDIO_DEBUG) io.emit('terminalOutput', line);
+}
+
+let audioBackend;
+try {
+    audioBackend = createBackend({ logger: audioLog });
+} catch (e) {
+    console.error('Audio backend creation failed:', e.message);
+    audioBackend = new NullBackend();
+}
+
+audioBackend.onStatusChange((connected, detail) => {
+    io.emit('vmStatus', { connected, backend: audioBackend.name });
+    if (detail) io.emit('terminalOutput', detail);
+});
+
+/** Push current state of a channel to all clients. */
+function broadcastChannel(channelId) {
+    audioBackend.getChannelState(channelId).then(state => {
+        io.emit('muteState', { stripIndex: channelId, muted: state.muted });
+        io.emit('faderState', { stripIndex: channelId, gain: state.gainDb });
+    }).catch(() => { /* ignore — backend is offline */ });
+}
+
+async function initAudioBackend() {
     try {
-        await voicemeeter.init();
-        await voicemeeter.login();
-        await voicemeeter.updateDeviceList();
-        vmConnected = true;
-        vmReconnectAttempt = 0;
-        console.log('Connected to Voicemeeter');
-        setVmStatus(true, `Connected to Voicemeeter (attempt ${attempt})`);
-        startVMHealthCheck();
-
-        // Read initial mute state from Voicemeeter
-        try {
-            const tvMuted = voicemeeter.getStripMute(3) !== 0;
-            const spMuted = voicemeeter.getStripMute(4) !== 0;
-            muteState[3] = tvMuted;
-            muteState[4] = spMuted;
-            io.emit('muteState', { stripIndex: 3, muted: tvMuted });
-            io.emit('muteState', { stripIndex: 4, muted: spMuted });
-        } catch(e) {
-            console.error('Failed to read initial mute state:', e.message || e);
+        await audioBackend.init();
+        if (audioBackend.isConnected()) {
+            const { mute, fader } = audioBackend.syncInitialState();
+            for (const [ch, muted] of Object.entries(mute)) {
+                io.emit('muteState', { stripIndex: Number(ch), muted });
+            }
+            for (const [ch, gain] of Object.entries(fader)) {
+                io.emit('faderState', { stripIndex: Number(ch), gain });
+            }
         }
-
-        // Read initial fader levels from Voicemeeter
-        try {
-            const tvGain = voicemeeter.getStripGain(3);
-            const spGain = voicemeeter.getStripGain(4);
-            io.emit('faderState', { stripIndex: 3, gain: tvGain });
-            io.emit('faderState', { stripIndex: 4, gain: spGain });
-        } catch(e) {
-            console.error('Failed to read initial fader levels:', e.message || e);
-        }
-    } catch (err) {
-        vmConnected = false;
-        stopVMHealthCheck();
-        console.error('Failed to connect to Voicemeeter:', err && err.message ? err.message : err);
-        setVmStatus(false, `Voicemeeter not available (attempt ${attempt}) — audio controls disabled`);
-        scheduleVMReconnect();
+    } catch (e) {
+        console.error('Audio backend init failed:', e.message);
+        io.emit('vmStatus', { connected: false, backend: audioBackend.name });
     }
 }
+
+// Server-side profile storage (keyed by name; value is { 3: gainDb, 4: gainDb })
+const profiles = {};
+
+// Saved audio levels per mode. Updated every time you leave a mode.
+// null = never visited, use defaults.
+let savedGameLevels = null;   // { 3: gainDb, 4: gainDb }
+let savedBreakLevels = null;  // { 3: gainDb, 4: gainDb }
 
 process.on('uncaughtException', err => {
     console.error('Uncaught exception:', err && err.message ? err.message : err);
@@ -217,7 +163,7 @@ process.on('unhandledRejection', err => {
 });
 
 connectOBSWebSocket();
-connectVoicemeeter();
+initAudioBackend();
 
 app.use(express.static('public'));
 
@@ -233,14 +179,16 @@ io.on('connection', async socket => {
         socket.emit('obsStatus', { connected: false });
     }
 
-    // Send current mute state to newly connected client
-    if (vmConnected) {
-        socket.emit('muteState', { stripIndex: 3, muted: muteState[3] });
-        socket.emit('muteState', { stripIndex: 4, muted: muteState[4] });
-        try {
-            socket.emit('faderState', { stripIndex: 3, gain: voicemeeter.getStripGain(3) });
-            socket.emit('faderState', { stripIndex: 4, gain: voicemeeter.getStripGain(4) });
-        } catch(e) {}
+    // Send current audio backend state to the new client
+    socket.emit('vmStatus', { connected: audioBackend.isConnected(), backend: audioBackend.name });
+    if (audioBackend.isConnected()) {
+        for (const id of [3, 4]) {
+            try {
+                const state = await audioBackend.getChannelState(id);
+                socket.emit('muteState', { stripIndex: id, muted: state.muted });
+                socket.emit('faderState', { stripIndex: id, gain: state.gainDb });
+            } catch (e) { /* skip */ }
+        }
     }
 
     socket.on('transition', async data => {
@@ -248,7 +196,6 @@ io.on('connection', async socket => {
             await obs.call('SetCurrentProgramScene', { 'sceneName': data.sceneName });
             console.log('Transitioned to scene:', data.sceneName);
             io.emit('terminalOutput', 'Transitioned to scene: ' + data.sceneName);
-
             io.emit('currentScene', { sceneName: data.sceneName });
         } catch (err) {
             console.error('Failed to transition:', err);
@@ -279,46 +226,45 @@ io.on('connection', async socket => {
     });
 
     socket.on('setVolume', async data => {
-        if (!vmConnected) {
-            socket.emit('terminalOutput', 'Voicemeeter not connected — cannot set volume');
+        if (!audioBackend.isConnected()) {
+            socket.emit('terminalOutput', 'Audio backend not connected — cannot set volume');
             return;
         }
         try {
-            const volume = parseFloat(data.volume);
-            voicemeeter.setStripGain(data.stripIndex, volume);
-            io.emit('terminalOutput', 'Set volume for virtual input: ' + data.stripIndex + ' to ' + volume + ' dB');
+            const gainDb = parseFloat(data.volume);
+            await audioBackend.setChannelGain(data.stripIndex, gainDb);
+            io.emit('faderState', { stripIndex: data.stripIndex, gain: gainDb });
+            const label = data.stripIndex === 3 ? 'TV' : 'Spotify';
+            io.emit('terminalOutput', 'Set volume for ' + label + ': ' + gainDb.toFixed(1) + ' dB');
         } catch (err) {
-            console.error('Failed to set volume for virtual input:', err);
-            io.emit('terminalOutput', 'Failed to set volume for virtual input: ' + err.message);
+            console.error('Failed to set volume:', err);
+            io.emit('terminalOutput', 'Failed to set volume: ' + err.message);
         }
     });
 
-    // ── Mute toggle via Voicemeeter
-    socket.on('toggleMute', data => {
-        if (!vmConnected) return;
+    socket.on('toggleMute', async data => {
+        if (!audioBackend.isConnected()) return;
         try {
             const strip = data.stripIndex;
-            const nowMuted = !muteState[strip];
-            muteState[strip] = nowMuted;
-            voicemeeter.setStripMute(strip, nowMuted);
+            const { muted } = await audioBackend.toggleMute(strip);
             const label = strip === 3 ? 'TV' : 'Spotify';
-            io.emit('muteState', { stripIndex: strip, muted: nowMuted });
-            io.emit('terminalOutput', (nowMuted ? 'Muted' : 'Unmuted') + ' ' + label);
+            io.emit('muteState', { stripIndex: strip, muted });
+            io.emit('terminalOutput', (muted ? 'Muted' : 'Unmuted') + ' ' + label);
         } catch (err) {
             console.error('Failed to toggle mute:', err);
         }
     });
 
-    // ── Save / Load audio profiles
-    const profiles = {};  // { profileName: { 3: -1.2, 4: -6.5 } }
-
-    socket.on('saveProfile', data => {
-        if (!vmConnected) return;
+    // ── Save / Load audio profiles ──────────────────────────────
+    socket.on('saveProfile', async data => {
+        if (!audioBackend.isConnected()) return;
         try {
             const name = data.name;
-            const strip3 = voicemeeter.getStripGain(3);
-            const strip4 = voicemeeter.getStripGain(4);
-            profiles[name] = { 3: strip3, 4: strip4 };
+            const [s3, s4] = await Promise.all([
+                audioBackend.getChannelState(3),
+                audioBackend.getChannelState(4),
+            ]);
+            profiles[name] = { 3: s3.gainDb, 4: s4.gainDb };
             socket.emit('profileSaved', { name, gains: profiles[name] });
             io.emit('terminalOutput', 'Saved profile: ' + name);
         } catch (err) {
@@ -326,14 +272,15 @@ io.on('connection', async socket => {
         }
     });
 
-    socket.on('loadProfile', data => {
-        if (!vmConnected) return;
+    socket.on('loadProfile', async data => {
+        if (!audioBackend.isConnected()) return;
         const p = profiles[data.name];
         if (!p) return;
         try {
-            voicemeeter.setStripGain(3, p[3]);
-            voicemeeter.setStripGain(4, p[4]);
+            await audioBackend.setMultiChannelGain({ 3: p[3], 4: p[4] });
             io.emit('profileLoaded', { name: data.name, gains: p });
+            io.emit('faderState', { stripIndex: 3, gain: p[3] });
+            io.emit('faderState', { stripIndex: 4, gain: p[4] });
             io.emit('terminalOutput', 'Loaded profile: ' + data.name);
         } catch (err) {
             console.error('Failed to load profile:', err);
@@ -344,58 +291,80 @@ io.on('connection', async socket => {
         socket.emit('profileList', profiles);
     });
 
-    // ── Health dashboard: force-reconnect a backend
+    // ── Health dashboard: force-reconnect a backend ────────────
     socket.on('requestReconnect', data => {
         if (data && data.target === 'obs') {
             io.emit('terminalOutput', 'Manual OBS reconnect requested from dashboard');
             try { obs.disconnect(); } catch (e) {}
             connectOBSWebSocket();
         } else if (data && data.target === 'vm') {
-            io.emit('terminalOutput', 'Manual Voicemeeter reconnect requested from dashboard');
-            connectVoicemeeter();
+            io.emit('terminalOutput', 'Manual audio backend reconnect requested from dashboard');
+            if (typeof audioBackend.reconnect === 'function') {
+                audioBackend.reconnect();
+            } else {
+                // Fall back to teardown + reinit
+                audioBackend.shutdown().then(() => initAudioBackend());
+            }
         }
     });
 
-    // ── Per-scene auto-profiles
-    socket.on('saveSceneProfile', data => {
-        if (!vmConnected) return;
+    // ── Per-scene auto-profiles ────────────────────────────────
+    socket.on('saveSceneProfile', async data => {
+        if (!audioBackend.isConnected()) return;
         try {
             const name = data.sceneName;
-            const strip3 = voicemeeter.getStripGain(3);
-            const strip4 = voicemeeter.getStripGain(4);
-            profiles['__scene_' + name] = { 3: strip3, 4: strip4 };
+            const [s3, s4] = await Promise.all([
+                audioBackend.getChannelState(3),
+                audioBackend.getChannelState(4),
+            ]);
+            profiles['__scene_' + name] = { 3: s3.gainDb, 4: s4.gainDb };
             io.emit('terminalOutput', 'Saved scene profile: ' + name);
         } catch (err) {
             console.error('Failed to save scene profile:', err);
         }
     });
 
-    socket.on('GameAction', async data => {
+    // Scene-action audio presets.
+    // Break always fades to fixed targets. Game restores the user's
+    // preferred levels (captured every time they move a fader).
+    const BREAK_PRESET = { tv: -60, sp: 0 };
+    const GAME_DEFAULT = { tv: 0, sp: -60 };
+
+    socket.on('GameAction', async () => {
         try {
-            const tvTarget = data && data.tvTarget !== undefined ? data.tvTarget : 0;
-            const spTarget = data && data.spTarget !== undefined ? data.spTarget : -60;
+            // Save current levels as Break's state before leaving it
+            if (audioBackend.isConnected()) {
+                const [tvNow, spNow] = await Promise.all([
+                    audioBackend.getChannelState(3),
+                    audioBackend.getChannelState(4),
+                ]);
+                savedBreakLevels = { 3: tvNow.gainDb, 4: spNow.gainDb };
+            }
+
+            const tvTarget = savedGameLevels ? savedGameLevels[3] : GAME_DEFAULT.tv;
+            const spTarget = savedGameLevels ? savedGameLevels[4] : GAME_DEFAULT.sp;
 
             // Switch OBS scene first for instant visual feedback
             await obs.call('SetCurrentProgramScene', { sceneName: 'Live Übertragung' });
             io.emit('terminalOutput', 'Switched to scene: Live Übertragung');
 
-            if (vmConnected) {
-                const fadeSteps = 60;
-                const stepDuration = 15; // ms
-
+            if (audioBackend.isConnected()) {
                 io.emit('terminalOutput', 'Fading audio.');
-                for (let i = 0; i <= fadeSteps; i++) {
-                    const progress = i / fadeSteps;
-                    const tvGain = Math.round(-60 * (1 - progress) + tvTarget * progress);
-                    const spGain = Math.round(-60 * progress + spTarget * (1 - progress));
-                    try {
-                        voicemeeter.setStripGain(3, tvGain);
-                        voicemeeter.setStripGain(4, spGain);
-                    } catch(e) {}
-                    await new Promise(resolve => setTimeout(resolve, stepDuration));
-                }
+                const [tvStart, spStart] = await Promise.all([
+                    audioBackend.getChannelState(3),
+                    audioBackend.getChannelState(4),
+                ]);
+                await audioBackend.applyPreset({
+                    channels: [
+                        { id: 3, fromDb: tvStart.gainDb, toDb: tvTarget },
+                        { id: 4, fromDb: spStart.gainDb, toDb: spTarget },
+                    ],
+                    durationMs: AUDIO_FADE_DURATION_MS,
+                });
+                io.emit('faderState', { stripIndex: 3, gain: tvTarget });
+                io.emit('faderState', { stripIndex: 4, gain: spTarget });
             } else {
-                io.emit('terminalOutput', 'Voicemeeter not connected — skipping audio fades.');
+                io.emit('terminalOutput', 'Audio backend not connected — skipping audio fades.');
             }
 
             io.emit('terminalOutput', 'Automated action completed successfully.');
@@ -407,35 +376,37 @@ io.on('connection', async socket => {
         }
     });
 
-    socket.on('PauseAction', async data => {
+    socket.on('PauseAction', async () => {
         try {
-            // Break: TV goes silent (-60), Spotify fades to user's level
-            const spTarget = data && data.spTarget !== undefined ? data.spTarget : 0;
+            // Snapshot current levels BEFORE fading, so GameAction
+            // can restore them exactly.
+            if (audioBackend.isConnected()) {
+                const [tvNow, spNow] = await Promise.all([
+                    audioBackend.getChannelState(3),
+                    audioBackend.getChannelState(4),
+                ]);
+                // Save current levels as Game's state before leaving it
+                savedGameLevels = { 3: tvNow.gainDb, 4: spNow.gainDb };
 
-            // Switch OBS scene first for instant visual feedback
-            await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
-            io.emit('terminalOutput', 'Switched to scene: Spotify');
+                // Switch OBS scene first for instant visual feedback
+                await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
+                io.emit('terminalOutput', 'Switched to scene: Spotify');
 
-            if (vmConnected) {
-                const fadeSteps = 60;
-                const stepDuration = 15; // ms
+                const tvTarget = savedBreakLevels ? savedBreakLevels[3] : BREAK_PRESET.tv;
+                const spTarget = savedBreakLevels ? savedBreakLevels[4] : BREAK_PRESET.sp;
 
-                for (let i = 0; i <= fadeSteps; i++) {
-                    const progress = i / fadeSteps;
-                    const mainInputGain = Math.round(-60 * progress);
-                    const spotifyInputGain = Math.round(spTarget * progress + (-60) * (1 - progress));
-
-                    try {
-                        voicemeeter.setStripGain(3, mainInputGain);
-                        voicemeeter.setStripGain(4, spotifyInputGain);
-                    } catch(e) {}
-
-                    await new Promise(resolve => setTimeout(resolve, stepDuration));
-                }
-
+                await audioBackend.applyPreset({
+                    channels: [
+                        { id: 3, fromDb: tvNow.gainDb, toDb: tvTarget },
+                        { id: 4, fromDb: spNow.gainDb, toDb: spTarget },
+                    ],
+                    durationMs: AUDIO_FADE_DURATION_MS,
+                });
+                io.emit('faderState', { stripIndex: 3, gain: tvTarget });
+                io.emit('faderState', { stripIndex: 4, gain: spTarget });
                 io.emit('terminalOutput', 'Faded out Main Input and faded in Spotify Input.');
             } else {
-                io.emit('terminalOutput', 'Voicemeeter not connected — skipping audio fades.');
+                io.emit('terminalOutput', 'Audio backend not connected — skipping audio fades.');
             }
 
             io.emit('terminalOutput', 'Automated action completed successfully.');
@@ -457,10 +428,9 @@ io.on('connection', async socket => {
 function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
-    stopVMHealthCheck();
     if (obsReconnectTimer) { clearTimeout(obsReconnectTimer); obsReconnectTimer = null; }
-    if (vmReconnectTimer) { clearTimeout(vmReconnectTimer); vmReconnectTimer = null; }
-    try { obs.disconnect(); } catch(e) {}
+    try { obs.disconnect(); } catch (e) {}
+    try { audioBackend.shutdown(); } catch (e) {}
     io.emit('terminalOutput', 'Server shutting down');
     server.close(() => process.exit(0));
     // Hard exit if not closed in 2s
