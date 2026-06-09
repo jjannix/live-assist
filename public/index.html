@@ -25,6 +25,7 @@
         <div class="status-pill">
             <span class="conn-dot" id="conn" data-s="wait"></span>
             <span class="conn-dot" id="obsConn" data-s="wait"></span>
+            <span class="backend-tag" id="backendTag" data-b="unknown" title="Audio backend">…</span>
             <span class="status-txt" id="statusTxt">Connecting...</span>
             <span class="timer" id="timer">00:00</span>
         </div>
@@ -192,6 +193,15 @@
         // ── OBS Status
         socket.on('obsStatus', d => { $('#obsConn').dataset.s = d.connected ? 'ok' : 'off'; });
 
+        // ── Audio backend
+        const backendLabels = { voicemeeter: 'VM', native: 'APP', none: 'OFF' };
+        socket.on('vmStatus', d => {
+            const tag = $('#backendTag');
+            const b = (d && d.backend) || 'unknown';
+            tag.dataset.b = b;
+            tag.textContent = backendLabels[b] || '?';
+        });
+
         // ── Dim
         $('#dimBtn').onclick = () => { document.body.classList.toggle('dim'); haptic(8); };
 
@@ -221,22 +231,31 @@
 
         let pendingTarget = null;
 
+        // Action buttons: tap → switch OBS scene + fade audio to that
+        // scene's preset levels (not the user's current fader positions).
+        // The user's live levels are still set on the server-side profile
+        // store via the profile chips, so a later scene switch can fade
+        // back to them — but the *action* itself is "go to game / break",
+        // which always means a specific audio target.
+        const sceneActionTargets = {
+            game:  { tv:   0, sp: -60 },
+            break: { tv: -60, sp:   0 },
+        };
         $$('.action-btn').forEach(btn => btn.addEventListener('click', () => {
             if (mode === 'switching') return;
             const target = btn.dataset.mode;
             if (target === mode) return;
-            
+
             haptic(20);
             setMode('switching');
             pendingTarget = target;
-            // Send current fader positions so the server fades to user's levels, not hardcoded 0
-            const tv = parseFloat($('#tvFader').value);
-            const sp = parseFloat($('#spFader').value);
+            const t = sceneActionTargets[target];
+            if (!t) return;
             if (target === 'break') {
-                socket.emit('PauseAction', { tvTarget: tv, spTarget: sp });
+                socket.emit('PauseAction', { tvTarget: t.tv, spTarget: t.sp });
                 toast('Switching to break', 'warn');
             } else {
-                socket.emit('GameAction', { tvTarget: tv, spTarget: sp });
+                socket.emit('GameAction', { tvTarget: t.tv, spTarget: t.sp });
                 toast('Switching to game', 'ok');
             }
         }));

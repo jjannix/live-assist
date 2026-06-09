@@ -95,6 +95,23 @@ body.dim {
     color: var(--text-2);
     transition: color 0.3s;
 }
+
+.backend-tag {
+    font-size: 9px; font-weight: 800;
+    letter-spacing: 0.6px;
+    color: var(--text-3);
+    background: var(--card-up);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 5px;
+    line-height: 1;
+    margin-left: 2px;
+    min-width: 22px; text-align: center;
+    transition: all 0.3s;
+}
+.backend-tag[data-b="voicemeeter"] { color: var(--accent); border-color: var(--border-hl); }
+.backend-tag[data-b="native"] { color: var(--green); border-color: var(--border-hl); }
+.backend-tag[data-b="none"] { color: var(--text-3); }
 body[data-mode="game"] .status-txt { color: var(--green); }
 body[data-mode="break"] .status-txt { color: var(--amber); }
 

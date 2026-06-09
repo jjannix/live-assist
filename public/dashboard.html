@@ -64,7 +64,7 @@
                 <span class="dash-card-state"><span class="conn-dot" id="obsDot" data-s="wait"></span><span id="obsState">connecting</span></span>
             </div>
             <div class="dash-card">
-                <span class="dash-card-lbl">VOICEMEETER</span>
+                <span class="dash-card-lbl" id="vmLbl">AUDIO</span>
                 <span class="dash-card-val" id="vmVal">—</span>
                 <span class="dash-card-state"><span class="conn-dot" id="vmDot" data-s="wait"></span><span id="vmState">connecting</span></span>
             </div>
@@ -95,7 +95,7 @@
 
         <div class="actions">
             <button class="action-btn-danger" id="reconnectObs">RECONNECT OBS</button>
-            <button class="action-btn-danger" id="reconnectVm">RECONNECT VOICEMEETER</button>
+            <button class="action-btn-danger" id="reconnectVm" disabled>RECONNECT AUDIO</button>
         </div>
 
     </main>
@@ -149,14 +149,20 @@
             }
         });
         socket.on('vmStatus', d => {
+            const backend = (d && d.backend) || 'audio';
+            const labelMap = { voicemeeter: 'VOICEMEETER', native: 'NATIVE', none: 'AUDIO' };
+            setText('#vmLbl', labelMap[backend] || 'AUDIO');
+            const btn = $('#reconnectVm');
+            btn.disabled = backend === 'none';
+            btn.textContent = 'RECONNECT ' + (labelMap[backend] || 'AUDIO');
             if (d.connected) {
                 setDot('#vmDot', 'ok');
                 setText('#vmVal', 'online');
                 setText('#vmState', 'connected');
             } else {
-                setDot('#vmDot', 'off');
-                setText('#vmVal', 'offline');
-                setText('#vmState', 'disconnected');
+                setDot('#vmDot', backend === 'none' ? 'wait' : 'off');
+                setText('#vmVal', backend === 'none' ? 'disabled' : 'offline');
+                setText('#vmState', backend === 'none' ? 'no audio backend' : 'disconnected');
             }
         });
 
