@@ -125,14 +125,6 @@
                     <button class="chip" id="saveProfileBtn">+ Save</button>
                 </div>
             </div>
-            <div class="panel">
-                <span class="panel-lbl">PRESETS</span>
-                <div class="panel-grid">
-                    <button class="chip preset-chip" data-preset="game">Game</button>
-                    <button class="chip preset-chip" data-preset="break">Break</button>
-                    <button class="chip preset-chip" data-preset="balanced">Mix</button>
-                </div>
-            </div>
         </div>
 
     </main>
@@ -489,17 +481,7 @@
             toast(`Loading ${btn.dataset.profile} profile`, 'info', 1000);
         }));
 
-        // ── Presets & Scenes
-        const presets = { game: { tv: 0, sp: -60 }, break: { tv: -60, sp: 0 }, balanced: { tv: -6, sp: -6 } };
-        $$('.preset-chip').forEach(btn => btn.addEventListener('click', () => {
-            const p = presets[btn.dataset.preset]; if (!p) return; haptic(10);
-            socket.emit('setVolume', { stripIndex: 3, volume: p.tv });
-            socket.emit('setVolume', { stripIndex: 4, volume: p.sp });
-            $('#tvFader').value = p.tv; updDb('tvDb', p.tv); updFill('tvFader');
-            $('#spFader').value = p.sp; updDb('spDb', p.sp); updFill('spFader');
-            toast(`${btn.dataset.preset[0].toUpperCase() + btn.dataset.preset.slice(1)} preset applied`, 'info', 1500);
-        }));
-
+        // ── Scenes
         $$('.scene-chip').forEach(b => b.addEventListener('click', () => { haptic(10); socket.emit('transition', { sceneName: b.dataset.scene }); }));
 
         // ── Drawer
