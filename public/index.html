@@ -80,18 +80,40 @@
             </div>
         </div>
 
-        <!-- Hero Space (Dynamic State Display + on-demand live peek) -->
+        <!-- Hero Space (mode ring ⇄ live peek, crossfaded by data-preview) -->
         <div class="hero-space">
-            <div class="hero-preview" id="heroPreview" hidden>
-                <img id="previewImg" alt="Live preview">
+            <div class="hero-stage" id="heroStage" data-preview="idle">
+                <!-- Idle: mode ring + current scene name -->
+                <div class="hero-idle">
+                    <div class="hero-ring" id="heroRing">
+                        <svg id="heroIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                        </svg>
+                    </div>
+                    <div class="hero-text" id="heroText">Waiting...</div>
+                </div>
+                <!-- Preview: captured frame + skeleton + error + meta -->
+                <div class="hero-preview">
+                    <div class="preview-frame">
+                        <img id="previewImg" alt="Live preview">
+                        <div class="preview-skeleton"></div>
+                        <div class="preview-err" id="previewErr"></div>
+                        <div class="preview-meta">
+                            <svg class="ic-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            <span class="preview-ts" id="previewTs">—</span>
+                            <span class="preview-age" id="previewAge"></span>
+                            <button class="preview-close" id="previewClose" type="button" aria-label="Close preview">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="hero-ring" id="heroRing">
-                <svg id="heroIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10"></circle>
-                </svg>
-            </div>
-            <div class="hero-text" id="heroText">Waiting...</div>
-            <button class="peek-hint" id="peekHint" type="button">tap to peek at live</button>
+            <button class="peek-btn" id="peekBtn" type="button" data-state="idle">
+                <svg class="ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="ic-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+                <span id="peekLabel">Peek at live</span>
+            </button>
         </div>
 
         <!-- Quick Panels: Scenes & Presets -->
@@ -220,7 +242,7 @@
             document.body.dataset.mode = m;
             // Clear any stale peek frame whenever the mode changes so
             // the hero never shows an out-of-date capture.
-            if (previewVisible) hidePreviewFrame();
+            if (previewVisible) hidePreview();
 
             $('#chTv').classList.toggle('idle', m === 'break');
             $('#chSp').classList.toggle('idle', m === 'game');
@@ -293,50 +315,89 @@
         setMode('unknown');
 
         // ── OBS preview (on-demand peek at the live feed) ─────────
-        // Tap the hint (or the preview image once shown) to grab ONE
-        // frame of the server-configured PREVIEW_SOURCE. Used to check
-        // whether the live feed has resumed while the beamer shows
-        // break images. No streaming — one tap, one JPEG.
-        const heroPreview = $('#heroPreview');
-        const previewImg = $('#previewImg');
-        const peekHint = $('#peekHint');
+        // Tap the peek button to capture ONE frame of PREVIEW_SOURCE
+        // (default: the Live scene) — checks whether the feed has
+        // resumed while the beamer shows break images. No streaming:
+        // one request → one JPEG → crossfades into the hero. The
+        // capture timestamp + live-updating age tell the operator how
+        // stale the frame is, which is the whole point of the feature.
+        const heroStage   = $('#heroStage');
+        const peekBtn     = $('#peekBtn');
+        const peekLabel   = $('#peekLabel');
+        const previewImg  = $('#previewImg');
+        const previewTs   = $('#previewTs');
+        const previewAge  = $('#previewAge');
+        const previewErr  = $('#previewErr');
+        const previewClose = $('#previewClose');
+
         let previewObjectUrl = null;
+        let previewCapturedAt = 0;
+        let previewAgeTimer = null;
+
+        const PEEK_LABELS = { idle: 'Peek at live', loading: 'Capturing…', live: 'Refresh', error: 'Retry' };
+
+        // Drive every visual from one state attribute so CSS handles
+        // all the crossfades; JS just flips the token.
+        function previewState(s) {
+            heroStage.dataset.preview = s;
+            peekBtn.dataset.state = s;
+            peekLabel.textContent = PEEK_LABELS[s] || 'Peek at live';
+            peekBtn.disabled = (s === 'loading');
+        }
+
+        function updateAge() {
+            if (!previewCapturedAt) return;
+            const s = Math.max(0, Math.floor((Date.now() - previewCapturedAt) / 1000));
+            let txt;
+            if (s < 4)       txt = 'just now';
+            else if (s < 60) txt = s + 's ago';
+            else             txt = Math.floor(s / 60) + 'm ' + (s % 60) + 's ago';
+            previewAge.textContent = '· ' + txt;
+            // Amber once the frame is old enough that the match state
+            // may have changed since capture — a nudge to re-peek.
+            previewAge.classList.toggle('stale', s >= 15);
+        }
+        function startAgeTimer() { stopAgeTimer(); updateAge(); previewAgeTimer = setInterval(updateAge, 1000); }
+        function stopAgeTimer() { if (previewAgeTimer) { clearInterval(previewAgeTimer); previewAgeTimer = null; } }
 
         function showPreviewFrame(buf) {
             const blob = new Blob([buf], { type: 'image/jpeg' });
             if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
             previewObjectUrl = URL.createObjectURL(blob);
             previewImg.src = previewObjectUrl;
-            heroPreview.hidden = false;
-            $('#heroRing').style.display = 'none';
-            $('#heroText').style.display = 'none';
-            peekHint.textContent = 'tap to refresh';
-            peekHint.classList.remove('loading');
+            previewCapturedAt = Date.now();
+            previewTs.textContent = new Date(previewCapturedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             previewVisible = true;
+            previewState('live');
+            startAgeTimer();
+            haptic(8);
         }
-        function hidePreviewFrame() {
-            heroPreview.hidden = true;
-            $('#heroRing').style.display = '';
-            $('#heroText').style.display = '';
-            if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
-            peekHint.textContent = 'tap to peek at live';
-            peekHint.classList.remove('loading');
+        function hidePreview() {
+            stopAgeTimer();
+            previewCapturedAt = 0;
             previewVisible = false;
+            if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+            previewImg.src = '';
+            previewAge.textContent = '';
+            previewAge.classList.remove('stale');
+            previewState('idle');
         }
         function requestPreview() {
             if ($('#obsConn').dataset.s !== 'ok') { toast('OBS not connected', 'err'); return; }
+            if (heroStage.dataset.preview === 'loading') return;   // ignore double-taps mid-capture
             haptic(10);
-            peekHint.textContent = 'capturing…';
-            peekHint.classList.add('loading');
+            previewState('loading');
             socket.emit('getPreview');
         }
-        peekHint.addEventListener('click', requestPreview);
+        peekBtn.addEventListener('click', requestPreview);
         previewImg.addEventListener('click', requestPreview);
+        previewClose.addEventListener('click', e => { e.stopPropagation(); haptic(8); hidePreview(); });
 
         socket.on('previewFrame', buf => showPreviewFrame(buf));
         socket.on('previewError', msg => {
-            peekHint.textContent = 'preview unavailable';
-            peekHint.classList.remove('loading');
+            previewErr.textContent = msg || 'capture failed';
+            previewState('error');
+            stopAgeTimer();
             toast('Preview failed: ' + msg, 'err', 3000);
         });
 

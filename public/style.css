@@ -281,30 +281,128 @@ body.dim[data-mode="break"] .hero-ring { border-color: rgba(120,53,15,0.4); box-
     color: var(--text);
 }
 
-/* On-demand live peek: a framed JPEG that replaces the ring+text. */
-.hero-preview {
-    width: min(62vw, 280px);
+/* ═══ Hero preview stage (idle ⇄ live peek crossfade) ═══ */
+/* Both states occupy the same grid cell and crossfade on data-preview. */
+.hero-stage {
+    display: grid;
+    width: 100%;
+    min-height: 120px;
+}
+.hero-idle, .hero-preview {
+    grid-area: 1 / 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px;
+    transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.hero-idle    { opacity: 1; transform: scale(1);    }
+.hero-preview { opacity: 0; transform: scale(0.9);  pointer-events: none; }
+
+.hero-stage[data-preview="loading"] .hero-idle,
+.hero-stage[data-preview="live"]    .hero-idle,
+.hero-stage[data-preview="error"]   .hero-idle {
+    opacity: 0; transform: scale(0.9); pointer-events: none;
+}
+.hero-stage[data-preview="loading"] .hero-preview,
+.hero-stage[data-preview="live"]    .hero-preview,
+.hero-stage[data-preview="error"]   .hero-preview {
+    opacity: 1; transform: scale(1); pointer-events: auto;
+}
+
+/* The frame holds the image + overlays */
+.preview-frame {
+    position: relative;
+    width: min(64vw, 300px);
     aspect-ratio: 16 / 9;
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
     border: 1px solid var(--border-hl);
-    background: #000;
-    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    background: #0a0a0a;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.5);
 }
-.hero-preview img {
+.preview-frame img {
     width: 100%; height: 100%;
     object-fit: cover; display: block;
     cursor: pointer;
+    transition: opacity 0.3s ease;
 }
-.peek-hint {
-    background: none; border: none;
-    color: var(--text-3);
-    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
-    cursor: pointer; padding: 4px 8px;
-    transition: color 0.2s;
+/* Hide the image while capturing or errored so the
+   skeleton / error surface shows through cleanly. */
+.hero-stage[data-preview="loading"] .preview-frame img,
+.hero-stage[data-preview="error"]   .preview-frame img { opacity: 0; }
+
+/* Capturing shimmer (reuses the app's pulse feel) */
+.preview-skeleton {
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg, #0a0a0a 25%, #1c1c1c 50%, #0a0a0a 75%);
+    background-size: 220% 100%;
+    animation: preview-shimmer 1.3s linear infinite;
+    opacity: 0;
+    transition: opacity 0.2s;
 }
-.peek-hint:active { color: var(--text); }
-.peek-hint.loading { color: var(--text-2); }
+.hero-stage[data-preview="loading"] .preview-skeleton { opacity: 1; }
+@keyframes preview-shimmer {
+    0%   { background-position: 220% 0; }
+    100% { background-position: -220% 0; }
+}
+
+/* Error surface inside the frame */
+.preview-err {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 12px;
+    font-size: 11px; font-weight: 600; color: var(--text-2);
+}
+.hero-stage[data-preview="error"] .preview-err { display: flex; }
+
+/* Meta bar: camera glyph + capture time + age + close */
+.preview-meta {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 6px 6px 9px;
+    background: linear-gradient(to top, rgba(0,0,0,0.88), rgba(0,0,0,0));
+    color: rgba(255,255,255,0.85);
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+.hero-stage[data-preview="live"] .preview-meta { opacity: 1; }
+.preview-meta .ic-cam { width: 12px; height: 12px; opacity: 0.8; }
+.preview-ts  { font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.preview-age { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.55); font-variant-numeric: tabular-nums; }
+.preview-age.stale { color: var(--amber); }
+.preview-close {
+    margin-left: auto;
+    width: 22px; height: 22px; border-radius: 11px;
+    border: none; background: rgba(255,255,255,0.16);
+    color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.1s;
+}
+.preview-close svg { width: 12px; height: 12px; }
+.preview-close:active { transform: scale(0.88); background: rgba(255,255,255,0.28); }
+
+/* Peek trigger — matches the app's chip / util-btn language */
+.peek-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text-2);
+    font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.peek-btn:active { transform: scale(0.94); background: var(--card-up); color: var(--text); }
+.peek-btn:disabled { opacity: 0.55; cursor: default; }
+.peek-btn svg { width: 14px; height: 14px; }
+.peek-btn .ic-eye { display: block; }
+.peek-btn .ic-spin { display: none; animation: peek-spin 0.85s linear infinite; }
+.peek-btn[data-state="loading"] .ic-eye  { display: none; }
+.peek-btn[data-state="loading"] .ic-spin { display: block; }
+@keyframes peek-spin { to { transform: rotate(360deg); } }
 
 /* ═══ Quick Panels (Scenes & Presets) ═══ */
 .quick-panels {
