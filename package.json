@@ -15,8 +15,6 @@
     "native-sound-mixer": "^3.4.6-win",
     "obs-websocket-js": "^5.0.5",
     "socket.io": "^4.7.5",
-    "vban": "^1.2.5",
-    "voicemeeter-connector": "^1.4.1",
     "voicemeeter-remote": "^0.5.0"
   }
 }
