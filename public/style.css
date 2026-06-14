@@ -79,6 +79,8 @@ body.dim {
 }
 .topbar-link:active { transform: scale(0.9); background: var(--card-up); }
 .topbar-link svg { width: 16px; height: 16px; }
+.topbar-nav { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.topbar-nav + .status-pill { margin-left: 8px; }
 
 .conn-dot {
     width: 6px; height: 6px; border-radius: 50%;
@@ -491,3 +493,20 @@ body.dim[data-mode="break"] .action-btn.break svg { stroke: #f59e0b; }
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-hl); border-radius: 2px; }
+
+/* ═══ Shared sub-page components (health, settings, …) ═══ */
+/* Back button in the sub-page topbar */
+.back-btn { width: 36px; height: 36px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
+.back-btn:active { transform: scale(0.9); background: var(--card-up); }
+.back-btn svg { width: 18px; height: 18px; }
+
+/* Content card + its label */
+.section { background: var(--card); border: 1px solid var(--border); border-radius: 18px; margin: 0 20px 16px; padding: 16px 18px; }
+.section-title { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: var(--text-3); margin-bottom: 12px; text-transform: uppercase; }
+
+/* Label / value row inside a card */
+.kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.kv:last-child { border-bottom: none; }
+.kv-k { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.kv-v { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+.kv-v.muted { color: var(--text-3); }

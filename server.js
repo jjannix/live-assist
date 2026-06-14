@@ -3,11 +3,13 @@ const http = require('http');
 const os = require('os');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
-const dotenv = require('dotenv');
-
 const { createBackend, NullBackend } = require('./audio/factory');
+const config = require('./config');
 
-dotenv.config();
+// .env is the single source of truth. Loaded once at boot with
+// override:true so a hand-edited (or in-app-edited) file always wins
+// over anything already present in process.env.
+config.load();
 
 const app = express();
 const server = http.createServer(app);
@@ -98,8 +100,8 @@ obs.on('ConnectionError', err => {
 });
 
 // ── Audio backend setup ───────────────────────────────────────────
-const AUDIO_FADE_DURATION_MS = parseInt(process.env.AUDIO_FADE_DURATION_MS, 10) || 900;
-const AUDIO_DEBUG = ['true', '1', 'yes'].includes((process.env.AUDIO_DEBUG || '').toLowerCase());
+let AUDIO_FADE_DURATION_MS = parseInt(process.env.AUDIO_FADE_DURATION_MS, 10) || 900;
+let AUDIO_DEBUG = ['true', '1', 'yes'].includes((process.env.AUDIO_DEBUG || '').toLowerCase());
 const AUDIO_LOG_PREFIX = '[audio] ';
 
 function audioLog(msg) {
@@ -164,6 +166,72 @@ process.on('unhandledRejection', err => {
 
 connectOBSWebSocket();
 initAudioBackend();
+
+// ── Live config editor (served at /config.html) ──────────────────
+// A browser can't touch the filesystem, so the editor talks to these
+// endpoints. POST writes the real .env and hot-reloads OBS + audio.
+app.use(express.json());
+
+app.get('/api/config', (req, res) => {
+    res.json({ fields: config.getClientView() });
+});
+
+app.post('/api/config', (req, res) => {
+    try {
+        config.writeValues((req.body && req.body.fields) || {});
+        reloadRuntime();
+        io.emit('terminalOutput', 'Configuration updated via the in-app editor.');
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('Config save failed:', e.message);
+        res.status(400).json({ ok: false, error: e.message });
+    }
+});
+
+app.get('/api/network', (req, res) => {
+    res.json({ urls: lanUrls() });
+});
+
+// Re-read .env and re-initialise OBS + audio so edits take effect
+// without restarting the process. The HTTP server keeps running; the
+// status pills flap briefly and recover on their own.
+function reloadRuntime() {
+    AUDIO_FADE_DURATION_MS = parseInt(process.env.AUDIO_FADE_DURATION_MS, 10) || 900;
+    AUDIO_DEBUG = ['true', '1', 'yes'].includes((process.env.AUDIO_DEBUG || '').toLowerCase());
+
+    // OBS — reconnect with (possibly) new URL / password
+    try { obs.disconnect(); } catch (e) { /* ignore */ }
+    connectOBSWebSocket();
+
+    // Audio — tear down the current backend and build a fresh one for
+    // the (possibly) new AUDIO_BACKEND / channel map.
+    const previous = audioBackend;
+    Promise.resolve().then(() => previous.shutdown()).catch(() => {}).then(() => {
+        try {
+            audioBackend = createBackend({ logger: audioLog });
+        } catch (e) {
+            console.error('Audio backend creation failed:', e.message);
+            audioBackend = new NullBackend();
+        }
+        audioBackend.onStatusChange((connected, detail) => {
+            io.emit('vmStatus', { connected, backend: audioBackend.name });
+            if (detail) io.emit('terminalOutput', detail);
+        });
+        return initAudioBackend();
+    });
+}
+
+function lanUrls() {
+    const out = [];
+    for (const [name, nets] of Object.entries(os.networkInterfaces())) {
+        for (const net of nets || []) {
+            if (net.family === 'IPv4' && !net.internal) {
+                out.push({ name, address: net.address, url: 'http://' + net.address + ':3000' });
+            }
+        }
+    }
+    return out;
+}
 
 app.use(express.static('public'));
 
@@ -442,6 +510,11 @@ process.on('SIGTERM', shutdown);
 server.listen(3000, () => {
     console.log('Server is running on port 3000');
     io.emit('terminalOutput', 'Server is running on port 3000');
+    const urls = lanUrls();
+    if (urls.length) {
+        urls.forEach(n => console.log('  Network: ' + n.url + '  (' + n.name + ')'));
+        io.emit('terminalOutput', 'Open on your phone: ' + urls[0].url);
+    }
 
     // ── Health dashboard: periodic stats broadcast
     function buildHealthStats() {

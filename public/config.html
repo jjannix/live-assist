@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>Live Assist · Settings</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
+    <style>
+        /* Settings page — form fields + save bar.
+           Cards (.section), back button (.back-btn) and rows (.kv)
+           now live in style.css and are shared with the health page. */
+        body { overflow-y: auto; }
+        .main { padding-bottom: 110px; }
+
+        /* ── Form fields ── */
+        .field { padding: 11px 0; border-bottom: 1px solid var(--border); }
+        .field:last-child { border-bottom: none; }
+        .field-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+        .field-label { font-size: 13px; font-weight: 600; color: var(--text-2); flex: 1; }
+        .field-help { font-size: 11px; line-height: 1.45; color: var(--text-3); margin: 4px 0 9px; }
+
+        .field input, .field select, .field textarea {
+            width: 100%; background: var(--card-up); border: 1px solid var(--border); border-radius: 12px;
+            padding: 12px 14px; color: var(--text); font-family: inherit; font-size: 14px;
+            -webkit-appearance: none; appearance: none; transition: border-color 0.15s;
+        }
+        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--border-hl); }
+        .field input::placeholder, .field textarea::placeholder { color: var(--text-3); }
+        .field textarea { resize: vertical; min-height: 54px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5; }
+        .field input[type=number] { max-width: 160px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; }
+        .field input[data-mono] { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; }
+        .field select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center; padding-right: 38px;
+        }
+
+        /* Password reveal */
+        .pw-wrap { position: relative; }
+        .pw-wrap input { padding-right: 44px; }
+        .pw-reveal { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 16px; background: transparent; border: none; color: var(--text-3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s; }
+        .pw-reveal:active { transform: translateY(-50%) scale(0.88); }
+        .pw-reveal svg { width: 16px; height: 16px; }
+
+        /* Toggle switch */
+        .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex: 0 0 auto; cursor: pointer; }
+        .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .switch .track { position: absolute; inset: 0; background: var(--border-hl); border-radius: 13px; transition: background 0.2s; }
+        .switch .track::before { content: ''; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: var(--text); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+        .switch input:checked + .track { background: var(--accent); }
+        .switch input:checked + .track::before { transform: translateX(20px); background: #000; }
+
+        /* ── Phone access ── */
+        .net-desc { font-size: 12px; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
+        .url-kv { cursor: pointer; transition: background 0.15s, transform 0.15s; }
+        .url-kv:active { background: var(--card-up); transform: scale(0.99); }
+        .url-kv .kv-v { color: var(--accent); word-break: break-all; text-align: right; }
+        .url-empty { font-size: 12px; color: var(--text-3); padding: 8px 0; }
+        .qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+        .qr-wrap canvas { border-radius: 12px; }
+        .qr-cap { font-size: 11px; color: var(--text-3); }
+
+        /* ── Save bar ── */
+        .save-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; gap: 14px; padding: 14px 20px calc(20px + var(--safe-b)); background: linear-gradient(to top, #000 55%, rgba(0,0,0,0)); }
+        .save-state { flex: 1; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-3); }
+        .save-state.dirty { color: var(--amber); }
+        .save-btn { padding: 14px 36px; border-radius: 100px; border: none; background: var(--accent); color: #000; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: transform 0.15s, opacity 0.15s; }
+        .save-btn:active { transform: scale(0.95); }
+        .save-btn:disabled { background: var(--card-up); color: var(--text-3); }
+
+        .loading { padding: 24px 20px; font-size: 13px; color: var(--text-3); }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <button class="back-btn" onclick="location.href='/'" aria-label="Back to controller">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="logo">SETTINGS</span>
+        <div class="status-pill">
+            <span class="conn-dot" id="conn" data-s="wait"></span>
+            <span class="status-txt" id="connTxt">connecting</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <div id="form"><div class="loading" id="loading">Loading…</div></div>
+
+        <div class="section">
+            <div class="section-title">Phone Access</div>
+            <p class="net-desc">Open one of these on your phone or tablet (same WiFi), or scan the code below. Tap a row to copy it.</p>
+            <div id="netRows"></div>
+            <div class="qr-wrap">
+                <canvas id="qr"></canvas>
+                <div class="qr-cap">Scan to open the controller on your phone</div>
+            </div>
+        </div>
+    </main>
+
+    <div class="save-bar">
+        <span class="save-state" id="dirty">All changes saved</span>
+        <button class="save-btn" id="save" type="button">Save</button>
+    </div>
+
+    <div class="toast-box" id="toastBox"></div>
+
+    <script>
+    (() => {
+        'use strict';
+        const $ = s => document.querySelector(s);
+        const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+
+        const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+        const form = $('#form');
+        const dirtyEl = $('#dirty');
+        const saveBtn = $('#save');
+        let dirtyFlag = false;
+
+        function markDirty() {
+            if (!dirtyFlag) { dirtyFlag = true; dirtyEl.textContent = 'Unsaved changes'; dirtyEl.classList.add('dirty'); }
+        }
+        function markClean() { dirtyFlag = false; dirtyEl.textContent = 'All changes saved'; dirtyEl.classList.remove('dirty'); }
+
+        function label(f) { return `<div class="field-label">${esc(f.label)}</div>`; }
+        function help(f)  { return f.help ? `<div class="field-help">${esc(f.help)}</div>` : ''; }
+
+        function control(f) {
+            switch (f.type) {
+                case 'select':
+                    return `<select data-key="${f.key}">` +
+                        f.options.map(o => `<option value="${esc(o.value)}"${o.value === f.value ? ' selected' : ''}>${esc(o.label)}</option>`).join('') +
+                        `</select>`;
+                case 'list':
+                    return `<textarea data-key="${f.key}" rows="2">${esc(f.value)}</textarea>`;
+                case 'number':
+                    return `<input data-key="${f.key}" type="number" inputmode="numeric" value="${esc(f.value)}">`;
+                case 'bool':
+                    return `<label class="switch"><input type="checkbox" data-key="${f.key}"${f.value === 'true' ? ' checked' : ''}><span class="track"></span></label>`;
+                case 'password': {
+                    const ph = f.passwordSet ? '•••••• currently set — leave blank to keep' : 'Enter OBS WebSocket password';
+                    return `<div class="pw-wrap"><input data-key="${f.key}" type="password" value="" placeholder="${esc(ph)}" autocomplete="new-password"><button type="button" class="pw-reveal" aria-label="Show password">${EYE}</button></div>`;
+                }
+                default:
+                    return `<input data-key="${f.key}" type="text" data-mono="" value="${esc(f.value)}">`;
+            }
+        }
+
+        function fieldHtml(f) {
+            if (f.type === 'bool') {
+                return `<div class="field"><div class="field-row">${label(f)}${control(f)}</div>${help(f)}</div>`;
+            }
+            return `<div class="field">${label(f)}${help(f)}${control(f)}</div>`;
+        }
+
+        function render(fields) {
+            let html = '', open = false;
+            for (const f of fields) {
+                if (f.section) { if (open) html += '</div>'; html += `<div class="section"><div class="section-title">${esc(f.section)}</div>`; open = true; }
+                html += fieldHtml(f);
+            }
+            if (open) html += '</div>';
+            form.innerHTML = html;
+            wireEvents();
+            markClean();
+        }
+
+        function wireEvents() {
+            form.querySelectorAll('[data-key]').forEach(el => {
+                el.addEventListener('input', markDirty);
+                el.addEventListener('change', markDirty);
+            });
+            // Live On/Off readout would need a label element; the track visual is enough
+            // Password reveal
+            form.querySelectorAll('.pw-reveal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const inp = btn.parentElement.querySelector('input');
+                    inp.type = inp.type === 'password' ? 'text' : 'password';
+                });
+            });
+        }
+
+        function collect() {
+            const out = {};
+            form.querySelectorAll('[data-key]').forEach(el => {
+                const k = el.dataset.key;
+                if (el.type === 'checkbox') out[k] = el.checked ? 'true' : 'false';
+                else if (el.type === 'password') { if (el.value !== '') out[k] = el.value; }   // blank = keep
+                else out[k] = el.value;
+            });
+            return out;
+        }
+
+        // ── Toast (reuses controller's .toast classes) ──
+        function toast(msg, type = 'info', dur = 2500) {
+            const c = $('#toastBox');
+            while (c.children.length >= 2) c.removeChild(c.firstChild);
+            const t = document.createElement('div');
+            t.className = `toast t-${type}`;
+            t.textContent = msg;
+            c.appendChild(t);
+            requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, dur);
+        }
+
+        // ── Load / save config ──
+        async function loadConfig() {
+            const r = await fetch('/api/config');
+            if (!r.ok) throw new Error('Could not load settings');
+            const j = await r.json();
+            render(j.fields);
+        }
+
+        async function loadNetwork() {
+            try {
+                const r = await fetch('/api/network');
+                const j = await r.json();
+                const box = $('#netRows');
+                if (j.urls && j.urls.length) {
+                    box.innerHTML = j.urls.map(u =>
+                        `<div class="kv url-kv" data-url="${esc(u.url)}"><span class="kv-k">${esc(u.name)}</span><span class="kv-v">${esc(u.url)}</span></div>`
+                    ).join('');
+                    box.querySelectorAll('.url-kv').forEach(row => row.addEventListener('click', () => {
+                        navigator.clipboard.writeText(row.dataset.url);
+                        toast('Copied to clipboard', 'ok', 1200);
+                    }));
+                    if (window.QRCode) QRCode.toCanvas($('#qr'), j.urls[0].url, { width: 172, margin: 2, color: { dark: '#ffffff', light: '#000000' } });
+                } else {
+                    box.innerHTML = '<div class="url-empty">No external network interfaces detected.</div>';
+                }
+            } catch (e) { /* network info is non-critical */ }
+        }
+
+        saveBtn.addEventListener('click', async () => {
+            saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+            try {
+                const r = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: collect() })
+                });
+                const j = await r.json();
+                if (!r.ok || !j.ok) throw new Error(j.error || 'Save failed');
+                toast('Saved — changes are live', 'ok');
+                await loadConfig();   // refresh (clears password field, updates toggle visuals)
+            } catch (e) {
+                toast(e.message, 'err');
+            } finally {
+                saveBtn.disabled = false; saveBtn.textContent = 'Save';
+            }
+        });
+
+        // ── Status pill (mirror the health page) ──
+        const socket = io();
+        socket.on('connect',      () => { $('#conn').dataset.s = 'ok';  $('#connTxt').textContent = 'connected'; });
+        socket.on('disconnect',   () => { $('#conn').dataset.s = 'off'; $('#connTxt').textContent = 'offline'; });
+        socket.on('connect_error',() => { $('#conn').dataset.s = 'wait'; $('#connTxt').textContent = 'reconnecting'; });
+
+        loadConfig().catch(e => { $('#loading').textContent = 'Failed to load: ' + e.message; });
+        loadNetwork();
+    })();
+    </script>
+</body>
+</html>
