@@ -36,7 +36,12 @@ timeout /t 4 /nobreak >nul
 
 :start_obs
 :: -- 3. OBS Studio ----------------------------------------------
-set "OBS_EXE=C:\Program Files\obs-studio\bin\64bit\obs64.exe"
+::       OBS resolves its data paths (locale/, plugins/) relative to
+::       its working directory, not the exe location. Launching it
+::       from anywhere else fails with "Failed to find locale/en-US.ini",
+::       so we set its startup dir to its own bin folder via /d.
+set "OBS_DIR=C:\Program Files\obs-studio\bin\64bit"
+set "OBS_EXE=%OBS_DIR%\obs64.exe"
 if exist "%OBS_EXE%" goto :obs_ok
 echo ERROR: OBS Studio not found at "%OBS_EXE%".
 echo        Install it from https://obsproject.com/download
@@ -45,7 +50,7 @@ pause
 exit /b 1
 :obs_ok
 echo Starting OBS Studio...
-start "" "%OBS_EXE%"
+start "" /d "%OBS_DIR%" "%OBS_EXE%"
 timeout /t 4 /nobreak >nul
 
 :: -- 4. Find an x64 Node.js -------------------------------------
