@@ -3,7 +3,7 @@ const http = require('http');
 const os = require('os');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
-const { createBackend, NullBackend } = require('./audio/factory');
+const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
 const config = require('./config');
 
 // .env is the single source of truth. Loaded once at boot with
@@ -110,18 +110,18 @@ function audioLog(msg) {
     if (AUDIO_DEBUG) io.emit('terminalOutput', line);
 }
 
-let audioBackend;
-try {
-    audioBackend = createBackend({ logger: audioLog });
-} catch (e) {
-    console.error('Audio backend creation failed:', e.message);
-    audioBackend = new NullBackend();
-}
+// Audio backend. 'auto' is resolved at init time (async): we try
+// Voicemeeter, and if the app isn't running we fall back to the native
+// per-app mixer. Explicit modes (voicemeeter/native/none) skip the
+// probe. Placeholder until selectAndInitAudioBackend() runs.
+let audioBackend = new NullBackend();
 
-audioBackend.onStatusChange((connected, detail) => {
-    io.emit('vmStatus', { connected, backend: audioBackend.name });
-    if (detail) io.emit('terminalOutput', detail);
-});
+function wireAudioStatus() {
+    audioBackend.onStatusChange((connected, detail) => {
+        io.emit('vmStatus', { connected, backend: audioBackend.name });
+        if (detail) io.emit('terminalOutput', detail);
+    });
+}
 
 /** Push current state of a channel to all clients. */
 function broadcastChannel(channelId) {
@@ -131,20 +131,30 @@ function broadcastChannel(channelId) {
     }).catch(() => { /* ignore — backend is offline */ });
 }
 
-async function initAudioBackend() {
+async function selectAndInitAudioBackend() {
+    const mode = (process.env.AUDIO_BACKEND || 'auto').toLowerCase().trim();
     try {
-        await audioBackend.init();
-        if (audioBackend.isConnected()) {
-            const { mute, fader } = audioBackend.syncInitialState();
-            for (const [ch, muted] of Object.entries(mute)) {
-                io.emit('muteState', { stripIndex: Number(ch), muted });
-            }
-            for (const [ch, gain] of Object.entries(fader)) {
-                io.emit('faderState', { stripIndex: Number(ch), gain });
-            }
+        if (mode === 'auto') {
+            audioBackend = await resolveAutoBackend({ logger: audioLog });
+        } else {
+            audioBackend = createBackend({ logger: audioLog });
+            await audioBackend.init();
         }
     } catch (e) {
         console.error('Audio backend init failed:', e.message);
+        try { await audioBackend.shutdown(); } catch (_) { /* ignore */ }
+        audioBackend = new NullBackend();
+    }
+    wireAudioStatus();
+    if (audioBackend.isConnected()) {
+        const { mute, fader } = audioBackend.syncInitialState();
+        for (const [ch, muted] of Object.entries(mute)) {
+            io.emit('muteState', { stripIndex: Number(ch), muted });
+        }
+        for (const [ch, gain] of Object.entries(fader)) {
+            io.emit('faderState', { stripIndex: Number(ch), gain });
+        }
+    } else {
         io.emit('vmStatus', { connected: false, backend: audioBackend.name });
     }
 }
@@ -165,7 +175,7 @@ process.on('unhandledRejection', err => {
 });
 
 connectOBSWebSocket();
-initAudioBackend();
+selectAndInitAudioBackend();
 
 // ── Live config editor (served at /config.html) ──────────────────
 // A browser can't touch the filesystem, so the editor talks to these
@@ -206,19 +216,9 @@ function reloadRuntime() {
     // Audio — tear down the current backend and build a fresh one for
     // the (possibly) new AUDIO_BACKEND / channel map.
     const previous = audioBackend;
-    Promise.resolve().then(() => previous.shutdown()).catch(() => {}).then(() => {
-        try {
-            audioBackend = createBackend({ logger: audioLog });
-        } catch (e) {
-            console.error('Audio backend creation failed:', e.message);
-            audioBackend = new NullBackend();
-        }
-        audioBackend.onStatusChange((connected, detail) => {
-            io.emit('vmStatus', { connected, backend: audioBackend.name });
-            if (detail) io.emit('terminalOutput', detail);
-        });
-        return initAudioBackend();
-    });
+    Promise.resolve()
+        .then(() => previous.shutdown()).catch(() => {})
+        .then(() => selectAndInitAudioBackend());
 }
 
 function lanUrls() {
@@ -371,7 +371,7 @@ io.on('connection', async socket => {
                 audioBackend.reconnect();
             } else {
                 // Fall back to teardown + reinit
-                audioBackend.shutdown().then(() => initAudioBackend());
+                audioBackend.shutdown().then(() => selectAndInitAudioBackend());
             }
         }
     });

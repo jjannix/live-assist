@@ -82,25 +82,76 @@ function createBackend(opts = {}) {
     }
 
     if (mode === 'auto') {
-        // Try Voicemeeter first (power users get the rich feature set)
-        try {
-            require.resolve('voicemeeter-remote');
-            const VM = require('./voicemeeter-backend');
-            return make(VM, { healthProbeStrip: opts.healthProbeStrip });
-        } catch (e) { /* not installed — fall through */ }
-
-        // Then native (no extra software required)
-        try {
-            require.resolve('native-sound-mixer');
-            const Native = require('./native-backend');
-            return make(Native, { channelMap: opts.channelMap || buildChannelMapFromEnv() });
-        } catch (e) { /* not installed — fall through */ }
-
-        // Nothing available — silent no-op
-        return make(NullBackend);
+        // 'auto' must be resolved at init time via resolveAutoBackend():
+        // the correct pick depends on whether the Voicemeeter *application*
+        // is running, which can only be learned by actually trying to
+        // connect. createBackend() is synchronous and can only check
+        // whether an npm package loads — which is always true for
+        // voicemeeter-remote (it's a dependency), so a sync 'auto' would
+        // always pick Voicemeeter and never fall back to native even when
+        // the app is absent. We throw rather than silently return a
+        // backend that is probably the wrong one.
+        throw new Error(
+            "AUDIO_BACKEND='auto' must be resolved via resolveAutoBackend() — " +
+            'createBackend() is synchronous and cannot detect whether the ' +
+            'Voicemeeter application is running'
+        );
     }
 
     throw new Error(`Unknown AUDIO_BACKEND value: "${mode}". Use auto, voicemeeter, native, or none.`);
 }
 
-module.exports = { createBackend, NullBackend };
+/**
+ * Resolve 'auto' at init time: try each backend's init() and keep the
+ * first that actually connects. Unlike createBackend(), this can tell
+ * the difference between "the voicemeeter-remote npm package is
+ * installed" and "the Voicemeeter application is running".
+ *
+ * Order: Voicemeeter (power-user features) → native (per-app volume) → none.
+ *
+ * @param {Object}  [opts]
+ * @param {Object}  [opts.channelMap]        forwarded to the native backend
+ * @param {number}  [opts.healthProbeStrip]  forwarded to the VM backend
+ * @param {(msg:string)=>void} [opts.logger] Logger forwarded to each backend
+ * @returns {Promise<AudioBackend>}
+ */
+async function resolveAutoBackend(opts = {}) {
+    const logger = opts.logger || (() => {});
+
+    // 1. Voicemeeter — one real connection attempt. If login fails, the
+    //    app isn't running; shut it down (which cancels its pending
+    //    reconnect timer) and fall through to native.
+    try {
+        require.resolve('voicemeeter-remote');
+        const VM = require('./voicemeeter-backend');
+        const vm = new VM({ healthProbeStrip: opts.healthProbeStrip });
+        vm.setLogger(logger);
+        await vm.init();
+        if (vm.isConnected()) return vm;
+        logger('Auto: Voicemeeter is not running — falling back to native');
+        await vm.shutdown().catch(() => {});
+    } catch (e) {
+        logger('Auto: Voicemeeter unavailable (' + (e && e.message ? e.message : e) + ')');
+    }
+
+    // 2. Native (per-app volume via native-sound-mixer, no extra software)
+    try {
+        require.resolve('native-sound-mixer');
+        const Native = require('./native-backend');
+        const native = new Native({ channelMap: opts.channelMap || buildChannelMapFromEnv() });
+        native.setLogger(logger);
+        await native.init();
+        if (native.isConnected()) return native;
+        await native.shutdown().catch(() => {});
+    } catch (e) {
+        logger('Auto: native backend unavailable (' + (e && e.message ? e.message : e) + ')');
+    }
+
+    // 3. Nothing available — audio disabled, OBS scene switching still works
+    logger('Auto: no audio backend available — audio disabled');
+    const none = new NullBackend();
+    none.setLogger(logger);
+    return none;
+}
+
+module.exports = { createBackend, resolveAutoBackend, NullBackend };
