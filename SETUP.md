@@ -59,7 +59,7 @@ finish OBS setup first.
 
 Open **OBS Studio** and do these three things. They're easy to miss.
 
-### 2a. Create three scenes with these EXACT names
+### 2a. Create at least two scenes with these EXACT names
 
 OBS scene names must match what the app expects, **character for character**
 (spaces and accents included). Create three scenes named:
@@ -67,7 +67,7 @@ OBS scene names must match what the app expects, **character for character**
 | Scene name | What goes in it |
 |------------|-----------------|
 | **`Live Übertragung`** | The live match feed (your game / capture source filling the screen) |
-| **`Spotify`** | Halftime music (a Spotify window capture, or just blank + audio) |
+| **`Spotify`** | Halftime music (a Spotify window capture) |
 | **`Zen`** | Idle / pre-game (logos, an attract loop, or anything calming) |
 
 > 🔤 **Spelling matters.** It's `Live Übertragung` — with the capital `U` and
@@ -86,7 +86,7 @@ This is how the app talks to OBS. It's **off by default**.
 
 In the same WebSocket settings window:
 
-1. Click **Show Password** (or **Authentication → Show connect info**)
+1. Click **Show Password** (or **Show connect info**)
 2. Copy the password — you'll paste it into the app in Step 4
 
 > 💡 This password is random and unique to your OBS. You can change it here if
@@ -105,7 +105,7 @@ cd C:\Users\<you>\jnk-live-assist
 
 This one command:
 
-- Updates the app from GitHub
+- Updates the app
 - Starts Voicemeeter (only if you have it installed — otherwise it uses Windows audio directly)
 - Launches OBS
 - Starts the server (a window titled **"jnk Live Assist - Server"** — leave it open)
@@ -144,10 +144,7 @@ On your **phone** (same WiFi as the PC):
 - **Scan the QR code**, or
 - **Type the URL** into the browser
 
-The controller loads. For a native-app feel:
-
-- **iPhone:** Safari → Share → **Add to Home Screen**
-- **Android:** Chrome → menu → **Install app**
+The controller loads.
 
 > 📱 You can connect multiple phones/tablets at once — they all stay in sync.
 
