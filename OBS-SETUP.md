@@ -24,7 +24,7 @@ If you only want the app side (install, password, phone), see
         Beamer
 ```
 
-The app then switches this scene ↔ **Spotify** (halftime) and mixes the audio.
+The app then switches this scene ↔ **Spotify** (halftime).
 
 ---
 
@@ -122,10 +122,9 @@ Create the scenes in OBS (the **Scenes** box, bottom-left → `+`).
 This is what's on the beamer during breaks. Two common options:
 
 - **Window Capture of Spotify** — shows the now-playing artwork/visualiser
-- **An image source** (club logo / sponsor board) + the music plays underneath
+- **An image source** (club logo / sponsor board)
 
-Add whichever fits your break vibe. The audio comes from Spotify regardless
-(see Step 5) — this scene is just the *picture*.
+Add whichever fits your break vibe.
 
 ### (Optional) Scene 3 — "Zen" (idle)
 
@@ -134,25 +133,7 @@ source. Skip it entirely if you don't need an idle screen.
 
 ---
 
-## Step 4 — Set up the audio in OBS
-
-The app controls volume **per app** in Windows. For those changes to reach the
-broadcast, OBS must capture the **system default audio device**:
-
-1. In OBS, look at the **Audio Mixer** panel (bottom-center)
-2. Make sure there's a **Desktop Audio** source capturing the default output
-   (it's there by default — if not, Settings → Audio → add it)
-
-That's the whole trick: the app turns Spotify down in Windows → the Desktop
-Audio source hears it → the broadcast's Spotify drops. No special routing.
-
-> ✅ Confirm the apps you want to control (browser, Spotify) are outputting to
-> the **default playback device**. If Spotify is set to a different output,
-> the app's faders won't affect it.
-
----
-
-## Step 5 — Fullscreen projection to the beamer
+## Step 4 — Fullscreen projection to the beamer
 
 Send the OBS output to the beamer:
 
@@ -172,15 +153,15 @@ The beamer should now show your `Live Übertragung` scene full-bleed.
 
 ---
 
-## Step 6 — Verify with the app
+## Step 5 — Verify with the app
 
 1. Start jnk Live Assist: `.\start.bat` (in the install folder)
 2. Enter your OBS WebSocket password in the app's ⚙️ Settings if you haven't
 3. Connect your phone (Settings → Phone Access → scan the QR code)
 4. On the phone, tap **Live** and **Spotify**
 
-The beamer should switch scenes, and moving the **Spotify** fader should change
-the halftime music volume in the room and in the broadcast.
+The beamer should now switch scenes when you tap **Live** and **Spotify** in
+the app.
 
 If the beamer doesn't switch: check the OBS dot in the app's top bar is green
 (see `SETUP.md` → Troubleshooting).
@@ -194,7 +175,6 @@ If the beamer doesn't switch: check the OBS dot in the app's top bar is green
 | Get clean video into OBS | PiP the source, then Window Capture the PiP window |
 | Match the video to the beamer | Right-click source → Transform → Fit to screen |
 | Send OBS to the beamer | Right-click preview → Fullscreen Projector (Program) → display 2 |
-| Make the app's volume reach the broadcast | Keep OBS Desktop Audio on the default device |
 | Switch scenes by phone | That's the app — `start.bat` + ⚙️ Settings + scan QR |
 
 ---
@@ -205,11 +185,6 @@ If the beamer doesn't switch: check the OBS dot in the app's top bar is green
   Duplicate. Win + P → **Extend**, then re-do the Fullscreen Projector.
 - **Window Capture is black** — PiP is an overlay. Use **Window Capture
   (Windows 10+)** or toggle Compatibility Mode (see Step 3).
-- **Volume faders move but nothing changes** — the app controls apps by
-  `.exe` name. Add yours in ⚙️ Settings → Channel apps. Defaults cover
-  common browsers + OBS + Spotify.
-- **PiP window disappears mid-match** — the source browser tab was closed.
-  Keep it open (minimised is fine).
 - **Scene button does nothing** — scene name spelling. Must be exactly
   `Live Übertragung` / `Spotify`.
 
