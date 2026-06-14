@@ -12,6 +12,7 @@ Built for the case where you're streaming a match, both hands are on the control
 - **Smooth fades** — slider movements ramp volume over ~1 second, no jump-cuts
 - **Auto-profiles** — audio settings follow scenes (e.g. lower game audio automatically when switching to halftime)
 - **Live activity log** — every action timestamped and visible in-app
+- **Live peek** — tap to grab a single frame of the broadcast feed, so you can see whether the match has resumed while the beamer shows halftime images
 - **PWA** — install on iOS / Android home screen, runs fullscreen
 - **Multi-device** — phone, tablet, laptop can all be controllers in parallel
 
@@ -145,6 +146,9 @@ All settings live in `.env`. See `.env.example` for the full annotated reference
 | `SCENES` | `Live Übertragung,Spotify,Zen` | OBS scene names, comma-separated |
 | `AUDIO_FADE_DURATION_MS` | `900` | Volume ramp time |
 | `AUDIO_DEBUG` | `0` | Set to `1` for verbose audio logs |
+| `PREVIEW_SOURCE` | `Live Übertragung` | OBS scene/source the "peek" button captures |
+| `PREVIEW_WIDTH` | `480` | Capture width in pixels |
+| `PREVIEW_QUALITY` | `70` | JPEG quality (1–100) |
 
 ## Audio backends
 

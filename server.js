@@ -323,6 +323,35 @@ io.on('connection', async socket => {
         }
     });
 
+    // ── OBS preview (on-demand single frame) ────────────────────
+    // The operator taps "peek" to capture ONE frame of PREVIEW_SOURCE
+    // (default: the Live scene) — used to check whether the live feed
+    // has resumed while the beamer shows break images. No continuous
+    // streaming, no loop: one request → one JPEG, sent as raw bytes.
+    socket.on('getPreview', async () => {
+        try {
+            const source = process.env.PREVIEW_SOURCE || 'Live Übertragung';
+            const width = parseInt(process.env.PREVIEW_WIDTH, 10) || 480;
+            const quality = Math.max(1, Math.min(100, parseInt(process.env.PREVIEW_QUALITY, 10) || 70));
+            const res = await obs.call('GetSourceScreenshot', {
+                sourceName: source,
+                imageFormat: 'jpeg',
+                imageWidth: width,
+                imageCompressionQuality: quality,
+            });
+            // OBS returns a base64 data URI. Strip the prefix and emit
+            // raw bytes so Socket.IO sends a binary frame instead of a
+            // ~33% larger base64 string.
+            const b64 = (res && res.imageData || '').replace(/^data:image\/\w+;base64,/, '');
+            socket.emit('previewFrame', Buffer.from(b64, 'base64'));
+        } catch (err) {
+            const msg = err && err.message ? err.message : err;
+            console.error('Preview failed:', msg);
+            socket.emit('previewError', String(msg));
+            io.emit('terminalOutput', 'Preview failed: ' + msg);
+        }
+    });
+
     // ── Save / Load audio profiles ──────────────────────────────
     socket.on('saveProfile', async data => {
         if (!audioBackend.isConnected()) return;

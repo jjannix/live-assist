@@ -80,14 +80,18 @@
             </div>
         </div>
 
-        <!-- Hero Space (Dynamic State Display) -->
+        <!-- Hero Space (Dynamic State Display + on-demand live peek) -->
         <div class="hero-space">
+            <div class="hero-preview" id="heroPreview" hidden>
+                <img id="previewImg" alt="Live preview">
+            </div>
             <div class="hero-ring" id="heroRing">
                 <svg id="heroIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <circle cx="12" cy="12" r="10"></circle>
                 </svg>
             </div>
             <div class="hero-text" id="heroText">Waiting...</div>
+            <button class="peek-hint" id="peekHint" type="button">tap to peek at live</button>
         </div>
 
         <!-- Quick Panels: Scenes & Presets -->
@@ -166,7 +170,7 @@
         const $ = s => document.querySelector(s);
         const $$ = s => document.querySelectorAll(s);
         const socket = io();
-        let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now();
+        let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now(), previewVisible = false;
         const haptic = ms => { if (navigator.vibrate) navigator.vibrate(ms); };
 
         // ── Timer
@@ -214,6 +218,9 @@
         function setMode(m) {
             mode = m;
             document.body.dataset.mode = m;
+            // Clear any stale peek frame whenever the mode changes so
+            // the hero never shows an out-of-date capture.
+            if (previewVisible) hidePreviewFrame();
 
             $('#chTv').classList.toggle('idle', m === 'break');
             $('#chSp').classList.toggle('idle', m === 'game');
@@ -284,6 +291,54 @@
         });
 
         setMode('unknown');
+
+        // ── OBS preview (on-demand peek at the live feed) ─────────
+        // Tap the hint (or the preview image once shown) to grab ONE
+        // frame of the server-configured PREVIEW_SOURCE. Used to check
+        // whether the live feed has resumed while the beamer shows
+        // break images. No streaming — one tap, one JPEG.
+        const heroPreview = $('#heroPreview');
+        const previewImg = $('#previewImg');
+        const peekHint = $('#peekHint');
+        let previewObjectUrl = null;
+
+        function showPreviewFrame(buf) {
+            const blob = new Blob([buf], { type: 'image/jpeg' });
+            if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = URL.createObjectURL(blob);
+            previewImg.src = previewObjectUrl;
+            heroPreview.hidden = false;
+            $('#heroRing').style.display = 'none';
+            $('#heroText').style.display = 'none';
+            peekHint.textContent = 'tap to refresh';
+            peekHint.classList.remove('loading');
+            previewVisible = true;
+        }
+        function hidePreviewFrame() {
+            heroPreview.hidden = true;
+            $('#heroRing').style.display = '';
+            $('#heroText').style.display = '';
+            if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+            peekHint.textContent = 'tap to peek at live';
+            peekHint.classList.remove('loading');
+            previewVisible = false;
+        }
+        function requestPreview() {
+            if ($('#obsConn').dataset.s !== 'ok') { toast('OBS not connected', 'err'); return; }
+            haptic(10);
+            peekHint.textContent = 'capturing…';
+            peekHint.classList.add('loading');
+            socket.emit('getPreview');
+        }
+        peekHint.addEventListener('click', requestPreview);
+        previewImg.addEventListener('click', requestPreview);
+
+        socket.on('previewFrame', buf => showPreviewFrame(buf));
+        socket.on('previewError', msg => {
+            peekHint.textContent = 'preview unavailable';
+            peekHint.classList.remove('loading');
+            toast('Preview failed: ' + msg, 'err', 3000);
+        });
 
         // ── Faders
         function updFill(id) {
