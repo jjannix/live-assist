@@ -393,8 +393,10 @@ io.on('connection', async socket => {
     });
 
     // Scene-action audio presets.
-    // Break always fades to fixed targets. Game restores the user's
-    // preferred levels (captured every time they move a fader).
+    // The active channel (TV in Game, Spotify in Break) restores the
+    // user's preferred level from the last visit. The inactive channel
+    // ALWAYS fades to silent (-60 dB), never a saved level — so Game
+    // fully mutes Spotify and Break fully mutes TV, every single time.
     const BREAK_PRESET = { tv: -60, sp: 0 };
     const GAME_DEFAULT = { tv: 0, sp: -60 };
 
@@ -410,7 +412,7 @@ io.on('connection', async socket => {
             }
 
             const tvTarget = savedGameLevels ? savedGameLevels[3] : GAME_DEFAULT.tv;
-            const spTarget = savedGameLevels ? savedGameLevels[4] : GAME_DEFAULT.sp;
+            const spTarget = GAME_DEFAULT.sp;   // Spotify: always fully silent in Game
 
             // Switch OBS scene first for instant visual feedback
             await obs.call('SetCurrentProgramScene', { sceneName: 'Live Übertragung' });
@@ -460,7 +462,7 @@ io.on('connection', async socket => {
                 await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
                 io.emit('terminalOutput', 'Switched to scene: Spotify');
 
-                const tvTarget = savedBreakLevels ? savedBreakLevels[3] : BREAK_PRESET.tv;
+                const tvTarget = BREAK_PRESET.tv;   // TV: always fully silent in Break
                 const spTarget = savedBreakLevels ? savedBreakLevels[4] : BREAK_PRESET.sp;
 
                 await audioBackend.applyPreset({
