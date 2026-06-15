@@ -42,8 +42,8 @@ const DEFAULTS = Object.freeze({
     // Demo slides (particles/equalizer/stats/ticker) ship OFF so they
     // don't appear unless the operator opts in.
     rotation: {
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false },
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false },
         dwellMs: 12000,
         pinned: null,
     },

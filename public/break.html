@@ -342,6 +342,158 @@
             to   { transform: translateX(-50%); }
         }
 
+        /* ═══════ Slide: split-flap (Solari departures board) ═══════ */
+        .splitflap {
+            display: flex; justify-content: center; gap: clamp(4px, 0.6vw, 8px);
+            font-family: var(--font-display);
+        }
+        .sf-cell {
+            position: relative;
+            width: clamp(48px, 5.5vw, 88px); height: clamp(70px, 8vw, 128px);
+            background: linear-gradient(180deg, #1a1a26 0%, #0e0e16 100%);
+            border: 1px solid var(--line-2);
+            border-radius: 8px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4);
+            perspective: 400px;
+            overflow: hidden;
+        }
+        /* Hairline across the middle — the flap hinge */
+        .sf-cell::after {
+            content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+            background: rgba(0,0,0,0.6); z-index: 5;
+        }
+        .sf-half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; }
+        .sf-top { top: 0; }
+        .sf-bot { bottom: 0; }
+        .sf-ch {
+            position: absolute; left: 0; right: 0;
+            font-size: clamp(48px, 5.5vw, 88px); font-weight: 700;
+            line-height: 1; text-align: center; color: var(--ink-0);
+            font-variant-numeric: tabular-nums;
+        }
+        .sf-top .sf-ch { top: 0; }
+        .sf-bot .sf-ch { bottom: 0; }
+        /* Top half reads slightly brighter — fake ambient light */
+        .sf-top .sf-ch { color: var(--ink-0); }
+        .sf-bot .sf-ch { color: #c8c8d8; }
+        /* The folding leaf: two faces, backface-hidden */
+        .sf-leaf {
+            position: absolute; left: 0; width: 100%; height: 50%; overflow: hidden;
+            z-index: 4; pointer-events: none;
+        }
+        .sf-leaf-top {
+            top: 0; transform-origin: bottom;
+            background: linear-gradient(180deg, #1a1a26 0%, #14141e 100%);
+        }
+        .sf-leaf-bot {
+            bottom: 0; transform-origin: top;
+            transform: rotateX(90deg);
+            background: linear-gradient(180deg, #0e0e16 0%, #14141e 100%);
+        }
+        .sf-leaf-top.go { animation: sf-fold-down 0.6s cubic-bezier(0.4, 0, 0.5, 1) forwards; }
+        .sf-leaf-bot.go { animation: sf-fold-up 0.6s cubic-bezier(0.5, 0, 0.6, 1) forwards; }
+        @keyframes sf-fold-down { 0% { transform: rotateX(0); } 50%, 100% { transform: rotateX(-90deg); } }
+        @keyframes sf-fold-up   { 0%, 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+
+        /* ═══════ Slide: neon (glowing outlined type) ═══════ */
+        .neon-slide { justify-content: center; padding-bottom: 80px; }
+        .neon-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 3vw, 44px);
+            --neon: #ff4d8d;
+            --neon-2: #61f3ff;
+        }
+        .neon-title, .neon-clock {
+            font-family: var(--font-display); font-weight: 700;
+            color: #fff;
+            /* Layered glow recipe — the classic neon look */
+            text-shadow:
+                0 0 4px #fff,
+                0 0 11px #fff,
+                0 0 19px var(--neon),
+                0 0 40px var(--neon),
+                0 0 80px var(--neon),
+                0 0 110px var(--neon);
+            animation: neon-flicker 5s infinite;
+        }
+        .neon-title { font-size: clamp(44px, 6vw, 92px); letter-spacing: 0.06em; text-transform: uppercase; }
+        .neon-clock {
+            font-size: clamp(120px, 17vw, 260px); letter-spacing: -0.03em;
+            font-variant-numeric: tabular-nums;
+            text-shadow:
+                0 0 6px #fff, 0 0 14px var(--neon-2), 0 0 30px var(--neon-2),
+                0 0 60px var(--neon-2), 0 0 100px var(--neon-2);
+        }
+        .neon-cap {
+            font-size: clamp(14px, 1.4vw, 22px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase;
+            color: var(--neon); text-shadow: 0 0 12px var(--neon);
+        }
+        @keyframes neon-flicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+            20%, 24%, 55% { opacity: 0.78; }   /* faint intermittent flicker */
+        }
+        /* Glow reflection on the floor */
+        .neon-floor {
+            position: absolute; left: 0; right: 0; bottom: 0; height: 30%;
+            background: radial-gradient(60% 100% at 50% 100%, rgba(255,77,141,0.18), transparent 70%);
+            pointer-events: none;
+        }
+
+        /* ═══════ Slide: wave (flowing liquid layers) ═══════ */
+        .slide[data-slide="wave"] { justify-content: flex-start; padding-bottom: 0; }
+        .wave-content {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: clamp(12px, 1.6vw, 24px);
+            z-index: 2;
+        }
+        .wave-content .clock {
+            font-size: clamp(120px, 16vw, 260px);
+            text-shadow: 0 0 60px rgba(124,106,255,0.2);
+        }
+        .wave-sea { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; z-index: 1; pointer-events: none; }
+        .wave-svg { width: 100%; height: 100%; display: block; }
+        .wave-path { fill: none; stroke-width: 0; }
+        .wave-path.w1 { fill: rgba(124,106,255,0.55); animation: wave-slide 14s linear infinite; }
+        .wave-path.w2 { fill: rgba(79,124,255,0.40); animation: wave-slide 20s linear infinite reverse; }
+        .wave-path.w3 { fill: rgba(96,165,250,0.25); animation: wave-slide 28s linear infinite; }
+        @keyframes wave-slide {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-50%); }   /* SVG tiles — needs a 2×-wide path for seamless loop */
+        }
+
+        /* ═══════ Slide: swiss (minimal — massive negative space) ═══════ */
+        .swiss-slide { justify-content: stretch; padding: 0; }
+        .swiss-grid {
+            position: relative; width: 100%; height: 100%;
+            display: grid; grid-template-rows: 1fr 1fr 1fr; grid-template-columns: 1fr 1fr 1fr;
+            padding: clamp(60px, 7vw, 120px);
+        }
+        /* Hairline grid */
+        .swiss-grid::before, .swiss-grid::after {
+            content: ''; position: absolute; background: var(--line); pointer-events: none;
+        }
+        .swiss-grid::before { left: 33.333%; right: 33.333%; top: 0; bottom: 0; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+        .swiss-grid::after  { top: 33.333%; bottom: 33.333%; left: 0; right: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .swiss-tl { grid-area: 1 / 1; align-self: start; justify-self: start; }
+        .swiss-center { grid-area: 2 / 2; align-self: center; justify-self: center; text-align: center; }
+        .swiss-br { grid-area: 3 / 3; align-self: end; justify-self: end; text-align: right; }
+        .swiss-label {
+            font-size: clamp(11px, 0.95vw, 14px); font-weight: 700;
+            letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink-2);
+        }
+        .swiss-clock {
+            font-family: var(--font-display);
+            font-size: clamp(80px, 11vw, 180px); font-weight: 700;
+            letter-spacing: -0.03em; line-height: 1; color: var(--ink-0);
+            font-variant-numeric: tabular-nums;
+        }
+        .swiss-score {
+            font-family: var(--font-display);
+            font-size: clamp(20px, 2vw, 30px); font-weight: 600;
+            color: var(--ink-1); margin-bottom: 6px;
+            font-variant-numeric: tabular-nums;
+        }
+
         /* Slide indicator (tiny dots, bottom-right) — shows which slide
            is live and how many are in the rotation. Subtle broadcast cue. */
         .indicators {
@@ -471,6 +623,54 @@
                     <div class="ticker-track" id="tickerTrack"></div>
                 </div>
             </section>
+
+            <!-- 11. Split-flap (Solari departures-board digits) -->
+            <section class="slide" data-slide="splitflap">
+                <h2 class="title" id="sfTitle">HALBZEIT</h2>
+                <div class="splitflap" id="splitflap"></div>
+                <div class="caption" id="sfCap">bis Anpfiff</div>
+            </section>
+
+            <!-- 12. Neon (glowing outlined type) -->
+            <section class="slide neon-slide" data-slide="neon">
+                <div class="neon-wrap">
+                    <h2 class="neon-title" id="neonTitle">HALBZEIT</h2>
+                    <div class="neon-clock" id="neonClock">15:00</div>
+                    <div class="neon-cap">bis Anpfiff</div>
+                </div>
+                <div class="neon-floor"></div>
+            </section>
+
+            <!-- 13. Wave (flowing SVG liquid layers) -->
+            <section class="slide" data-slide="wave">
+                <div class="wave-content">
+                    <div class="clock" id="waveClock">15:00</div>
+                    <div class="caption" id="waveCap">bis Anpfiff</div>
+                </div>
+                <div class="wave-sea">
+                    <svg class="wave-svg" viewBox="0 0 1440 320" preserveAspectRatio="none">
+                        <path class="wave-path w3" d="M0,160 C240,260 480,60 720,160 C960,260 1200,60 1440,160 L1440,320 L0,320 Z"></path>
+                        <path class="wave-path w2" d="M0,200 C240,120 480,280 720,200 C960,120 1200,280 1440,200 L1440,320 L0,320 Z"></path>
+                        <path class="wave-path w1" d="M0,240 C240,300 480,180 720,240 C960,300 1200,180 1440,240 L1440,320 L0,320 Z"></path>
+                    </svg>
+                </div>
+            </section>
+
+            <!-- 14. Swiss (minimal: massive negative space, hairline grid) -->
+            <section class="slide swiss-slide" data-slide="swiss">
+                <div class="swiss-grid">
+                    <div class="swiss-tl">
+                        <div class="swiss-label" id="swissTitleLbl">Halbzeit</div>
+                    </div>
+                    <div class="swiss-center">
+                        <div class="swiss-clock" id="swissClock">15:00</div>
+                    </div>
+                    <div class="swiss-br">
+                        <div class="swiss-score" id="swissScore"></div>
+                        <div class="swiss-label" id="swissMatchLbl">HT</div>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <!-- Persistent lower-third -->
@@ -589,6 +789,19 @@
             $('#pCap').textContent = done ? 'Anpfiff' : (t.running ? 'bis Anpfiff' : 'pausiert');
             $('#eqClock').textContent = fmt(rem);
             $('#eqTitle').textContent = (s.title || 'HALBZEIT').toUpperCase();
+            // Neon + wave + swiss + splitflap mirrors
+            $('#neonClock').textContent = fmt(rem);
+            $('#neonTitle').textContent = (s.title || 'HALBZEIT').toUpperCase();
+            $('#waveClock').textContent = fmt(rem); $('#waveClock').classList.toggle('done', done);
+            $('#waveCap').textContent = done ? 'Anpfiff' : (t.running ? 'bis Anpfiff' : 'pausiert');
+            $('#sfTitle').textContent = (s.title || 'HALBZEIT').toUpperCase();
+            $('#sfCap').textContent = done ? 'Anpfiff' : (t.running ? 'bis Anpfiff' : 'pausiert');
+            setFlap($('#splitflap'), fmt(rem));
+            $('#swissClock').textContent = fmt(rem);
+            $('#swissTitleLbl').textContent = (s.title || 'Halbzeit');
+            const hsw = s.home || {}, asw = s.away || {};
+            $('#swissScore').textContent = (hsw.name || asw.name) ? ((hsw.name||'—') + '  ' + (hsw.score||0) + ' : ' + (asw.score||0) + '  ' + (asw.name||'—')) : '';
+            $('#swissMatchLbl').textContent = ((s.matchClock && s.matchClock.label) || 'HT');
 
             // Rotation
             applyRotation(s.rotation || {});
@@ -815,6 +1028,54 @@
             track.innerHTML = html + html;
         }
         function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+        // ── Split-flap (Solari departures-board digits) ───────────
+        // Each character is a card split at the midline; on change a
+        // leaf folds down (old top) while another unfolds up (new
+        // bottom), exactly like an airport board. Only CHANGED cells
+        // animate, and non-digits (':') render as static cells.
+        const FLIP_MS = 600;
+        function sfCellHtml(ch) {
+            return '<div class="sf-cell" data-char="' + ch + '">' +
+                '<div class="sf-half sf-top"><span class="sf-ch">' + ch + '</span></div>' +
+                '<div class="sf-half sf-bot"><span class="sf-ch">' + ch + '</span></div>' +
+                '<div class="sf-leaf sf-leaf-top"><span class="sf-ch">' + ch + '</span></div>' +
+                '<div class="sf-leaf sf-leaf-bot"><span class="sf-ch">' + ch + '</span></div>' +
+            '</div>';
+        }
+        function setFlap(root, text) {
+            if (!root) return;
+            const chars = String(text).split('');
+            let cells = root.querySelectorAll('.sf-cell');
+            if (cells.length !== chars.length) {
+                root.innerHTML = chars.map(sfCellHtml).join('');
+                return;
+            }
+            chars.forEach((ch, i) => {
+                const cell = cells[i];
+                if (cell.dataset.char !== ch) flipCell(cell, ch);
+            });
+        }
+        function flipCell(cell, newCh) {
+            const oldCh = cell.dataset.char || newCh;
+            if (oldCh === newCh) return;
+            const leafTop = cell.querySelector('.sf-leaf-top .sf-ch');
+            const leafBot = cell.querySelector('.sf-leaf-bot .sf-ch');
+            leafTop.textContent = oldCh;
+            leafBot.textContent = newCh;
+            // Static top → NEW immediately (covered by leaf-top until it folds past 90deg)
+            cell.querySelector('.sf-top .sf-ch').textContent = newCh;
+            const lt = cell.querySelector('.sf-leaf-top');
+            const lb = cell.querySelector('.sf-leaf-bot');
+            lt.classList.remove('go'); lb.classList.remove('go');
+            void cell.offsetWidth;
+            lt.classList.add('go'); lb.classList.add('go');
+            setTimeout(() => {
+                cell.querySelector('.sf-bot .sf-ch').textContent = newCh;
+                lt.classList.remove('go'); lb.classList.remove('go');
+            }, FLIP_MS);
+            cell.dataset.char = newCh;
+        }
 
         socket.on('breakState', render);
         socket.on('connect', () => socket.emit('breakStateGet'));
