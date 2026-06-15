@@ -228,59 +228,6 @@
             </div>
         </div>
 
-        <!-- Predictions -->
-        <div class="section">
-            <div class="section-title">Tipps</div>
-            <div class="field">
-                <div class="field-lbl">Frage</div>
-                <input id="predQuestion" type="text" maxlength="80" placeholder="Wie steht es am Ende?">
-            </div>
-            <div style="padding-top:8px">
-                <button class="chip" id="clearPreds" style="width:100%;padding:14px 0;font-size:14px">Tipps zurücksetzen</button>
-            </div>
-        </div>
-
-        <!-- Standings -->
-        <div class="section">
-            <div class="section-title">Tabelle</div>
-            <div class="field">
-                <div class="field-lbl">Liga</div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button class="chip" data-div="bl1">Bundesliga</button>
-                    <button class="chip" data-div="bl2">2. Bundesliga</button>
-                    <button class="chip" data-div="bl3">3. Liga</button>
-                </div>
-            </div>
-            <div style="padding-top:8px">
-                <button class="chip" id="refreshStandings" style="width:100%;padding:14px 0;font-size:14px">Jetzt aktualisieren</button>
-            </div>
-        </div>
-
-        <!-- Trivia -->
-        <div class="section">
-            <div class="section-title">Trivia</div>
-            <div id="triviaList" style="display:flex;flex-direction:column;gap:8px"></div>
-            <div style="display:flex;gap:8px;padding-top:12px">
-                <input id="triviaNew" type="text" maxlength="240" placeholder="Neuer Fakt…" style="flex:1">
-                <button class="chip" id="addTrivia" style="padding:0 18px">+</button>
-            </div>
-        </div>
-
-        <!-- Mosaic -->
-        <div class="section">
-            <div class="section-title">Mosaic</div>
-            <div id="mosaicList" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
-            <input id="mosaicFile" type="file" accept="image/*" multiple hidden>
-            <div style="display:flex;gap:8px;padding-top:12px">
-                <button class="chip" id="mosaicPick" style="flex:1;padding:12px 0">+ Fotos</button>
-                <button class="chip" id="mosaicPrune" style="padding:12px 14px" title="Unbenutzte Dateien löschen">⎁</button>
-            </div>
-        </div>
-
-    </main>
-
-    <div class="toast-box" id="toastBox"></div>
-
     <script>
     (() => {
         'use strict';
@@ -331,17 +278,6 @@
             syncUnlessFocused('#message', s.message || '');
             renderRotation(s.rotation);
             renderAd(s.ad);
-            renderPredictions(s.predictions);
-            renderStandings(s.standings);
-            renderTrivia(s.trivia);
-            renderMosaic(s.mosaic);
-        }
-        function renderPredictions(p) {
-            p = p || {};
-            syncUnlessFocused('#predQuestion', p.question || '');
-            const total = p.total || 0;
-            const clr = $('#clearPreds');
-            if (clr) clr.textContent = total > 0 ? (total + ' Tipps zurücksetzen') : 'Tipps zurücksetzen';
         }
         function syncUnlessFocused(sel, val) {
             const el = $(sel); if (document.activeElement !== el) el.value = val;
@@ -382,7 +318,7 @@
         debounce('#message',  v => ({ message: v }));
 
         // ── Slide rotation ──
-        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', brand: 'Brand', particles: 'Partikel', equalizer: 'Equalizer', stats: 'Stats', ticker: 'Ticker', splitflap: 'Klapptafel', neon: 'Neon', wave: 'Welle', swiss: 'Swiss', audiolizer: 'Audiolizer', flowfield: 'Flowfield', predictions: 'Tipps', standings: 'Tabelle', trivia: 'Trivia', mosaic: 'Mosaic' };
+        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', brand: 'Brand', flowfield: 'Flowfield' };
         let rotation = {};
         function renderRotation(r) {
             rotation = r || {};
@@ -485,69 +421,6 @@
             const ms = parseInt(v, 10);
             if (Number.isFinite(ms)) socket.emit('breakAd', { op: 'dwell', dwellMs: ms * 1000 });
         });
-        debounce('#predQuestion', v => ({ predictions: { question: v } }));
-        $('#clearPreds').onclick = () => { socket.emit('breakPredictionsClear'); toast('Tipps zurückgesetzt', 'info', 1000); };
-
-        // ── Standings ──
-        function renderStandings(sg) {
-            sg = sg || {};
-            const cur = sg.division || 'bl1';
-            document.querySelectorAll('[data-div]').forEach(b => b.classList.toggle('active', b.dataset.div === cur));
-        }
-        document.querySelectorAll('[data-div]').forEach(b => b.onclick = () => {
-            // Just the socket patch — the server hooks division changes
-            // to a refresh, so the slide gets fresh data.
-            socket.emit('breakUpdate', { standings: { division: b.dataset.div } });
-            toast('Liga gewechselt, aktualisiere…', 'info', 1200);
-        });
-        $('#refreshStandings').onclick = () => { fetch('/api/standings/refresh', { method: 'POST' }).then(r => r.json()).then(j => toast(j.ok ? ('Tabelle aktualisiert · ' + j.rows + ' Teams') : 'Fehler', j.ok ? 'ok' : 'err')); };
-
-        // ── Trivia ──
-        function renderTrivia(t) {
-            t = t || {};
-            const list = $('#triviaList'); if (!list) return;
-            list.innerHTML = (t.items || []).map((it, i) =>
-                '<div style="display:flex;gap:8px;align-items:flex-start"><div style="flex:1;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:13px;line-height:1.4">' + escapeHtml(it) + '</div><button class="chip" data-tidx="' + i + '" style="padding:8px 10px">×</button></div>'
-            ).join('') || '<div style="color:var(--ink-3);font-size:13px;font-style:italic">Noch keine Fakten — unten einen hinzufügen.</div>';
-            list.querySelectorAll('[data-tidx]').forEach(b => b.onclick = () => {
-                const idx = +b.dataset.tidx;
-                socket.emit('breakUpdate', { op: 'trivia/remove', index: idx });
-            });
-        }
-        function addTriviaFact() {
-            const inp = $('#triviaNew');
-            const v = (inp.value || '').trim();
-            if (!v) return;
-            socket.emit('breakUpdate', { op: 'trivia/add', text: v });
-            inp.value = '';
-        }
-        $('#addTrivia').onclick = addTriviaFact;
-        $('#triviaNew').onkeydown = e => { if (e.key === 'Enter') addTriviaFact(); };
-
-        // ── Mosaic ──
-        function renderMosaic(m) {
-            m = m || {};
-            const list = $('#mosaicList'); if (!list) return;
-            const files = m.files || [];
-            list.innerHTML = files.map(f =>
-                '<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--panel);border:1px solid var(--line)"><img src="/break-mosaic/' + encodeURIComponent(f) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.opacity=0.3"><button data-mfile="' + f + '" style="position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:12px;border:none;background:rgba(0,0,0,0.7);color:#fff;cursor:pointer;font-size:14px;line-height:1">×</button></div>'
-            ).join('') || '<div style="grid-column:1/-1;color:var(--ink-3);font-size:13px;font-style:italic">Keine Fotos — unten hochladen.</div>';
-            list.querySelectorAll('[data-mfile]').forEach(b => b.onclick = () => {
-                fetch('/api/break-mosaic/' + encodeURIComponent(b.dataset.mfile), { method: 'DELETE' });
-            });
-        }
-        $('#mosaicPick').onclick = () => $('#mosaicFile').click();
-        $('#mosaicFile').onchange = async e => {
-            for (const f of e.target.files) {
-                const data = await new Promise((res, rej) => {
-                    const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f);
-                });
-                await fetch('/api/break-mosaic/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, data }) });
-            }
-            e.target.value = '';
-            toast('Hochgeladen', 'ok', 1200);
-        };
-        $('#mosaicPrune').onclick = () => fetch('/api/break-mosaic/prune', { method: 'POST' }).then(r => r.json()).then(j => toast(j.removed + ' Dateien gelöscht', 'ok'));
 
         function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
