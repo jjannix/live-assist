@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#07070c">
+    <title>Tipp · Live Assist</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #07070c; --ink: #f6f6fb; --ink-2: #b8b8c8; --ink-3: #6e6e80; --accent: #7c6aff; --line: rgba(255,255,255,0.08); --line-2: rgba(255,255,255,0.16); }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background: var(--bg); color: var(--ink);
+            min-height: 100dvh; padding: calc(20px + env(safe-area-inset-top)) 20px 40px;
+            display: flex; flex-direction: column; align-items: center; gap: 24px;
+            background-image: radial-gradient(120% 60% at 50% 0%, rgba(124,106,255,0.14), transparent 55%);
+        }
+        .top { text-align: center; display: flex; flex-direction: column; gap: 6px; }
+        .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+        .question { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; line-height: 1.1; max-width: 18ch; }
+        .sub { font-size: 13px; color: var(--ink-2); }
+        .teams { display: flex; align-items: center; justify-content: center; gap: 16px; width: 100%; max-width: 440px; }
+        .team-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .team-name { font-size: 15px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; text-align: center; min-height: 2.4em; display: flex; align-items: center; }
+        .score-pick { font-family: 'Space Grotesk', sans-serif; font-size: 64px; font-weight: 700; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+        .steppers { display: flex; gap: 8px; }
+        .stepper {
+            width: 44px; height: 44px; border-radius: 22px;
+            border: 1px solid var(--line-2); background: transparent; color: var(--ink);
+            font-size: 22px; font-weight: 700; cursor: pointer; transition: all 0.15s;
+        }
+        .stepper:active { transform: scale(0.9); background: var(--accent); color: #000; border-color: var(--accent); }
+        .vs { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 500; color: var(--ink-3); align-self: center; }
+        .submit {
+            width: 100%; max-width: 440px; padding: 18px;
+            border-radius: 100px; border: none;
+            background: var(--accent); color: #000;
+            font-family: inherit; font-size: 16px; font-weight: 800; letter-spacing: 0.5px;
+            cursor: pointer; transition: transform 0.15s, opacity 0.2s;
+        }
+        .submit:active { transform: scale(0.97); }
+        .submit:disabled { opacity: 0.4; }
+        .thanks { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+        .thanks .big { font-family: 'Space Grotesk', sans-serif; font-size: 80px; font-weight: 700; color: var(--accent); }
+        .thanks .msg { font-size: 16px; color: var(--ink-2); }
+        .again { padding: 12px 28px; border-radius: 100px; border: 1px solid var(--line-2); background: transparent; color: var(--ink); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+        .foot { margin-top: auto; font-size: 11px; color: var(--ink-3); letter-spacing: 1px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div class="top" id="topForm">
+        <span class="eyebrow">jnk · Live Assist</span>
+        <h1 class="question" id="question">Wie steht es am Ende?</h1>
+        <span class="sub">Tippe den Endstand — deine Stimme erscheint live auf dem Beamer.</span>
+    </div>
+
+    <div class="teams" id="pickers">
+        <div class="team-col">
+            <div class="team-name" id="homeName">Heim</div>
+            <div class="score-pick" id="homeScore">0</div>
+            <div class="steppers">
+                <button class="stepper" data-side="home" data-d="-1">−</button>
+                <button class="stepper" data-side="home" data-d="1">+</button>
+            </div>
+        </div>
+        <div class="vs">:</div>
+        <div class="team-col">
+            <div class="team-name" id="awayName">Gast</div>
+            <div class="score-pick" id="awayScore">0</div>
+            <div class="steppers">
+                <button class="stepper" data-side="away" data-d="-1">−</button>
+                <button class="stepper" data-side="away" data-d="1">+</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="submit" id="submit">Tipp abgeben</button>
+
+    <div class="thanks" id="thanks" hidden>
+        <div class="big" id="thanksScore">0 : 0</div>
+        <div class="msg">Danke! Dein Tipp ist auf dem Beamer.</div>
+        <button class="again" id="again">Neuer Tipp</button>
+    </div>
+
+    <div class="foot" id="total">Noch keine Tipps</div>
+
+    <script>
+    (() => {
+        const $ = s => document.querySelector(s);
+        const socket = io();
+        let home = 0, away = 0;
+
+        function clamp(n) { return Math.max(0, Math.min(9, n)); }
+        function render() { $('#homeScore').textContent = home; $('#awayScore').textContent = away; }
+        function scoreStr() { return home + ':' + away; }
+
+        document.querySelectorAll('.stepper').forEach(b => b.onclick = () => {
+            const side = b.dataset.side, d = parseInt(b.dataset.d, 10);
+            if (navigator.vibrate) navigator.vibrate(8);
+            if (side === 'home') home = clamp(home + d);
+            else away = clamp(away + d);
+            render();
+        });
+
+        $('#submit').onclick = () => {
+            if (navigator.vibrate) navigator.vibrate(20);
+            const s = scoreStr();
+            socket.emit('predict', { score: s });
+            $('#thanksScore').textContent = s;
+            $('#pickers').style.display = 'none';
+            $('#submit').style.display = 'none';
+            $('#topForm').style.display = 'none';
+            $('#thanks').hidden = false;
+        };
+        $('#again').onclick = () => {
+            home = 0; away = 0; render();
+            $('#thanks').hidden = true;
+            $('#topForm').style.display = '';
+            $('#pickers').style.display = '';
+            $('#submit').style.display = '';
+        };
+
+        socket.on('breakState', s => {
+            $('#question').textContent = (s.predictions && s.predictions.question) || 'Wie steht es am Ende?';
+            const total = (s.predictions && s.predictions.total) || 0;
+            $('#total').textContent = total > 0 ? total + ' Tipps abgegeben' : 'Noch keine Tipps';
+            const h = s.home || {}, a = s.away || {};
+            if (h.name) $('#homeName').textContent = h.name;
+            if (a.name) $('#awayName').textContent = a.name;
+        });
+        socket.emit('breakStateGet');
+        render();
+    })();
+    </script>
+</body>
+</html>

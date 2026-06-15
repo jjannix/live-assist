@@ -42,8 +42,8 @@ const DEFAULTS = Object.freeze({
     // Demo slides (particles/equalizer/stats/ticker) ship OFF so they
     // don't appear unless the operator opts in.
     rotation: {
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false },
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss', 'audiolizer', 'flowfield', 'predictions'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false, audiolizer: false, flowfield: false, predictions: false },
         dwellMs: 12000,
         pinned: null,
     },
@@ -60,6 +60,13 @@ const DEFAULTS = Object.freeze({
         { label: 'Ecken', value: 12 },
         { label: 'Freistösse', value: 8 },
     ],
+    // Audience predictions for the 'predictions' slide. Audience votes
+    // from /predict.html; the tally streams live to the break screen.
+    predictions: {
+        question: 'Wie steht es am Ende?',
+        tally: {},          // { "2:1": 3, "1:1": 5, ... }
+        total: 0,
+    },
 });
 
 let state = load();
@@ -263,6 +270,23 @@ function setStats(arr) {
     commit();
 }
 
+// ── audience predictions ──────────────────────────────────────────
+
+/** Record one audience prediction (score string like "2:1"). */
+function votePrediction(score) {
+    const s = String(score || '').trim().slice(0, 12);
+    if (!s) return;
+    state.predictions.tally[s] = (state.predictions.tally[s] || 0) + 1;
+    state.predictions.total++;
+    commit();
+}
+
+function clearPredictions() {
+    state.predictions.tally = {};
+    state.predictions.total = 0;
+    commit();
+}
+
 // ── pub/sub ───────────────────────────────────────────────────────
 
 /** Subscribe to state changes. Returns an unsubscribe fn. */
@@ -274,7 +298,7 @@ function subscribe(fn) {
 module.exports = {
     get, update, setScore,
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
-    setRotation, setAd, setAdLogo, setStats,
+    setRotation, setAd, setAdLogo, setStats, votePrediction, clearPredictions,
     subscribe,
     DEFAULTS,
 };

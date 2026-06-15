@@ -584,6 +584,12 @@ io.on('connection', async socket => {
     socket.on('breakRotation', patch => breakState.setRotation(patch));
     socket.on('breakAd',       patch => breakState.setAd(patch));
 
+    // ── Audience predictions (from /predict.html) ────────────────
+    // Public, unauthenticated votes — one tap = one vote. A real poll
+    // would dedupe per device; for a venue break screen this is fine.
+    socket.on('predict',            d => breakState.votePrediction(d && d.score));
+    socket.on('breakPredictionsClear', () => breakState.clearPredictions());
+
     socket.on('disconnect', () => {
         console.log('Client disconnected');
         io.emit('terminalOutput', 'Client disconnected');

@@ -494,6 +494,63 @@
             font-variant-numeric: tabular-nums;
         }
 
+        /* ═══════ Slide: audiolizer (mic-reactive visualizer) ═══════ */
+        .slide-canvas { padding: 0; }
+        .audio-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+        .audio-overlay {
+            position: relative; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; gap: 16px;
+        }
+        /* Bass-driven halo behind the wordmark */
+        .audio-bass-ring {
+            position: absolute; width: clamp(280px, 36vw, 540px); aspect-ratio: 1;
+            border-radius: 50%; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.6);
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
+            opacity: 0.5; transition: transform 0.08s linear, opacity 0.2s;
+            pointer-events: none; z-index: 1;
+        }
+        .audio-overlay .brand-word { position: relative; z-index: 2; }
+
+        /* ═══════ Slide: flowfield (generative particle art) ═══════ */
+        .flow-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+        .flow-overlay {
+            position: relative; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            mix-blend-mode: screen;
+        }
+
+        /* ═══════ Slide: predictions (live audience tips) ═══════ */
+        .pred-eyebrow {
+            font-size: clamp(13px, 1.1vw, 17px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--accent);
+        }
+        .pred-grid {
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+            gap: clamp(12px, 1.6vw, 24px);
+            max-width: 1100px;
+        }
+        .pred-tile {
+            font-family: var(--font-display);
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            padding: clamp(14px, 1.6vw, 24px) clamp(20px, 2.4vw, 36px);
+            border-radius: 16px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(6px);
+            animation: pred-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .pred-tile.top { border-color: var(--accent); box-shadow: 0 0 32px var(--accent-glow); }
+        .pred-tile .score { font-size: clamp(40px, 5vw, 80px); font-weight: 700; color: var(--ink-0); line-height: 1; font-variant-numeric: tabular-nums; }
+        .pred-tile.top .score { color: var(--accent); }
+        .pred-tile .count { font-size: clamp(12px, 1vw, 15px); font-weight: 600; color: var(--ink-2); }
+        @keyframes pred-in { from { opacity: 0; transform: scale(0.7) translateY(10px); } to { opacity: 1; transform: none; } }
+        .pred-empty { font-size: clamp(20px, 2.2vw, 32px); color: var(--ink-3); font-style: italic; }
+        .pred-qr-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+        .pred-qr-row canvas { width: clamp(80px, 8vw, 110px) !important; height: clamp(80px, 8vw, 110px) !important; border-radius: 10px; background: #fff; padding: 6px; }
+        .pred-qr-cap { font-size: clamp(12px, 1vw, 15px); font-weight: 600; color: var(--ink-2); }
+        .pred-qr-cap strong { display: block; color: var(--ink-0); font-weight: 700; }
+
         /* Slide indicator (tiny dots, bottom-right) — shows which slide
            is live and how many are in the rotation. Subtle broadcast cue. */
         .indicators {
@@ -671,6 +728,35 @@
                     </div>
                 </div>
             </section>
+
+            <!-- 15. Audiolizer (mic-reactive visualizer) -->
+            <section class="slide slide-canvas" data-slide="audiolizer">
+                <canvas class="audio-canvas" id="audioCanvas"></canvas>
+                <div class="audio-overlay">
+                    <div class="audio-bass-ring" id="bassRing"></div>
+                    <div class="brand-word">HALBZEIT</div>
+                    <div class="caption" id="audioCap">Live aus dem Raum</div>
+                </div>
+            </section>
+
+            <!-- 16. Flowfield (generative particle art) -->
+            <section class="slide slide-canvas" data-slide="flowfield">
+                <canvas class="flow-canvas" id="flowCanvas"></canvas>
+                <div class="flow-overlay">
+                    <div class="brand-word">jnk</div>
+                    <div class="brand-sub">Live Assist</div>
+                </div>
+            </section>
+
+            <!-- 17. Predictions (live audience tips) -->
+            <section class="slide" data-slide="predictions">
+                <div class="pred-eyebrow">Zuschauer-Tipps</div>
+                <div class="pred-grid" id="predGrid"></div>
+                <div class="pred-qr-row" id="predQrRow" hidden>
+                    <canvas id="predQr"></canvas>
+                    <div class="pred-qr-cap"><strong>Scannen &amp; mittippen</strong><span id="predTotal">0 Tipps</span></div>
+                </div>
+            </section>
         </div>
 
         <!-- Persistent lower-third -->
@@ -774,8 +860,9 @@
             // Ad
             renderAd(s.ad || {});
 
-            // Stats + ticker (cheap to rebuild each render)
+            // Stats + predictions + ticker (cheap to rebuild each render)
             renderStats(s.stats || []);
+            renderPredictions(s.predictions || {});
             renderTicker(s);
 
             // Clocks
@@ -888,12 +975,14 @@
 
         function showSlide(name) {
             $$('.slide').forEach(el => el.classList.toggle('active', el.dataset.slide === name));
-            // Lifecycle: start/stop the canvas particle system so it
-            // only burns CPU while visible, and kick the stat count-up
-            // each time the stats slide appears.
+            // Lifecycle: start/stop canvas systems so they only burn CPU
+            // while visible, and kick the count-up / flow restarts.
             if (name === 'particles') startParticles(); else stopParticles();
+            if (name === 'audiolizer') startAudio(); else stopAudio();
+            if (name === 'flowfield') startFlow(); else stopFlow();
             if (name === 'stats') animateStats();
             buildEqualizer();   // idempotent — builds bars once
+            if (name === 'predictions') buildPredQr();
         }
 
         // ── Particles (canvas constellation) ──────────────────────
@@ -1075,6 +1164,158 @@
                 lt.classList.remove('go'); lb.classList.remove('go');
             }, FLIP_MS);
             cell.dataset.char = newCh;
+        }
+
+        // ── Audiolizer (mic-reactive visualizer) ───────────────────
+        // Tries getUserMedia (room mic picks up the Spotify / PA).
+        // On denial / no input, falls back to a synthetic pulse so the
+        // slide is never static. Either way: a radial frequency ring
+        // around the wordmark + a bass-driven halo. rAF gated by slide.
+        let aCtx = null, aAnalyser = null, aData = null, aRaf = null, aIsLive = false;
+        async function startAudio() {
+            if (aIsLive) return;
+            aIsLive = true;
+            const cv = $('#audioCanvas');
+            if (!cv) return;
+            const ctx = cv.getContext('2d');
+            const resize = () => { cv.width = cv.offsetWidth; cv.height = cv.offsetHeight; };
+            resize();
+            aData = aData || new Uint8Array(128);
+            // Try the real mic
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                aCtx = new (window.AudioContext || window.webkitAudioContext)();
+                aAnalyser = aCtx.createAnalyser();
+                aAnalyser.fftSize = 256;
+                aCtx.createMediaStreamSource(stream).connect(aAnalyser);
+            } catch (_) { /* permission denied / no mic — synthetic fallback */ }
+            const cx = () => cv.width / 2, cy = () => cv.height / 2;
+            const draw = () => {
+                ctx.clearRect(0, 0, cv.width, cv.height);
+                let bass = 0;
+                if (aAnalyser) {
+                    aAnalyser.getByteFrequencyData(aData);
+                    // Average low-end for the bass halo
+                    for (let i = 0; i < 12; i++) bass += aData[i];
+                    bass = bass / (12 * 255);
+                } else {
+                    // Synthetic: a slow synthetic pulse so the visual is alive
+                    bass = 0.35 + 0.35 * Math.sin(performance.now() / 600);
+                }
+                // Drive the bass halo CSS var
+                const ring = $('#bassRing');
+                if (ring) {
+                    const scale = 0.6 + bass * 1.2;
+                    ring.style.transform = 'translate(-50%,-50%) scale(' + scale + ')';
+                    ring.style.opacity = 0.35 + bass * 0.6;
+                }
+                // Draw the radial frequency ring
+                const R = Math.min(cv.width, cv.height) * 0.32;
+                const bins = 96;
+                for (let i = 0; i < bins; i++) {
+                    const ang = (i / bins) * Math.PI * 2;
+                    let amp;
+                    if (aAnalyser) {
+                        const idx = Math.min(127, Math.floor(i / bins * 128));
+                        amp = aData[idx] / 255;
+                    } else {
+                        // Synthetic: layered sines shaped like a spectrum
+                        const t = performance.now() / 1000;
+                        amp = 0.3 + 0.7 * Math.abs(Math.sin(i * 0.3 + t * 1.3) * Math.cos(i * 0.15 + t * 0.7));
+                    }
+                    const len = R * (0.15 + amp * 0.85);
+                    const x1 = cx() + Math.cos(ang) * R;
+                    const y1 = cy() + Math.sin(ang) * R;
+                    const x2 = cx() + Math.cos(ang) * (R + len);
+                    const y2 = cy() + Math.sin(ang) * (R + len);
+                    ctx.strokeStyle = 'rgba(124,106,255,' + (0.4 + amp * 0.5) + ')';
+                    ctx.lineWidth = 2 + amp * 4;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                }
+                aRaf = requestAnimationFrame(draw);
+            };
+            stopAudio();
+            aRaf = requestAnimationFrame(draw);
+        }
+        function stopAudio() {
+            if (aRaf) { cancelAnimationFrame(aRaf); aRaf = null; }
+            // Keep the analyser/mic context alive (acquiring the mic stream is
+            // expensive) but stop drawing. Restart on next show.
+        }
+
+        // ── Flowfield (generative particle art) ────────────────────
+        // ~500 particles curl through a sin-based vector field, leaving
+        // fading trails. Evolves forever, never repeats. Pure aesthetic.
+        let fParticles = null, fRaf = null;
+        function startFlow() {
+            const cv = $('#flowCanvas');
+            if (!cv) return;
+            const ctx = cv.getContext('2d');
+            const resize = () => { cv.width = cv.offsetWidth; cv.height = cv.offsetHeight; };
+            resize();
+            const N = Math.max(300, Math.min(700, Math.round(cv.width * cv.height / 4200)));
+            if (!fParticles || fParticles.length !== N) {
+                fParticles = Array.from({ length: N }, () => ({
+                    x: Math.random() * cv.width,
+                    y: Math.random() * cv.height,
+                    life: Math.random() * 200,
+                }));
+            }
+            // Trail: a semi-transparent black overlay each frame, instead
+            // of clearing — old positions fade out instead of vanishing.
+            const draw = () => {
+                ctx.fillStyle = 'rgba(7,7,12,0.04)';
+                ctx.fillRect(0, 0, cv.width, cv.height);
+                const t = performance.now() / 1200;
+                for (const p of fParticles) {
+                    // Flow angle: layered sines for organic curls (no noise lib)
+                    const ang = (Math.sin(p.x * 0.006 + t) + Math.cos(p.y * 0.006 - t * 0.8)) * Math.PI;
+                    p.x += Math.cos(ang) * 1.2;
+                    p.y += Math.sin(ang) * 1.2;
+                    p.life++;
+                    if (p.x < 0) p.x = cv.width; if (p.x > cv.width) p.x = 0;
+                    if (p.y < 0) p.y = cv.height; if (p.y > cv.height) p.y = 0;
+                    // Hue drifts across the field so the composition is alive
+                    const hue = (p.life * 0.3 + t * 30) % 360;
+                    ctx.fillStyle = 'hsla(' + (250 + (p.life * 0.5) % 80) + ',90%,65%,0.5)';
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 1.1, 0, Math.PI * 2); ctx.fill();
+                }
+                fRaf = requestAnimationFrame(draw);
+            };
+            stopFlow();
+            fRaf = requestAnimationFrame(draw);
+        }
+        function stopFlow() { if (fRaf) { cancelAnimationFrame(fRaf); fRaf = null; } }
+
+        // ── Predictions (live audience tips) ──────────────────────
+        function renderPredictions(p) {
+            const grid = $('#predGrid');
+            const tally = p.tally || {};
+            const entries = Object.keys(tally).map(k => ({ score: k, count: tally[k] }));
+            entries.sort((a, b) => b.count - a.count);
+            const top = entries.slice(0, 6);
+            const total = p.total || 0;
+            const qrRow = $('#predQrRow');
+            const tot = $('#predTotal');
+            if (total === 0) {
+                grid.innerHTML = '<div class="pred-empty">Noch keine Tipps — QR scannen und mitraten!</div>';
+                qrRow.hidden = false; tot.textContent = '0 Tipps';
+                return;
+            }
+            grid.innerHTML = top.map((e, i) =>
+                '<div class="pred-tile' + (i === 0 ? ' top' : '') + '">' +
+                '<div class="score">' + escapeHtml(e.score) + '</div>' +
+                '<div class="count">' + e.count + '×</div></div>'
+            ).join('');
+            qrRow.hidden = false;
+            tot.textContent = total + ' Tipp' + (total === 1 ? '' : 's');
+        }
+        function buildPredQr() {
+            const qr = $('#predQr');
+            if (!qr || qr.width > 0) return;  // already drawn
+            if (window.QRCode) QRCode.toCanvas(qr, window.location.origin + '/predict.html', { width: 110, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
         }
 
         socket.on('breakState', render);

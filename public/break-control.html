@@ -214,6 +214,18 @@
             </div>
         </div>
 
+        <!-- Predictions -->
+        <div class="section">
+            <div class="section-title">Tipps</div>
+            <div class="field">
+                <div class="field-lbl">Frage</div>
+                <input id="predQuestion" type="text" maxlength="80" placeholder="Wie steht es am Ende?">
+            </div>
+            <div style="padding-top:8px">
+                <button class="chip" id="clearPreds" style="width:100%;padding:14px 0;font-size:14px">Tipps zurücksetzen</button>
+            </div>
+        </div>
+
     </main>
 
     <div class="toast-box" id="toastBox"></div>
@@ -268,6 +280,14 @@
             syncUnlessFocused('#message', s.message || '');
             renderRotation(s.rotation);
             renderAd(s.ad);
+            renderPredictions(s.predictions);
+        }
+        function renderPredictions(p) {
+            p = p || {};
+            syncUnlessFocused('#predQuestion', p.question || '');
+            const total = p.total || 0;
+            const clr = $('#clearPreds');
+            if (clr) clr.textContent = total > 0 ? (total + ' Tipps zurücksetzen') : 'Tipps zurücksetzen';
         }
         function syncUnlessFocused(sel, val) {
             const el = $(sel); if (document.activeElement !== el) el.value = val;
@@ -308,7 +328,7 @@
         debounce('#message',  v => ({ message: v }));
 
         // ── Slide rotation ──
-        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', brand: 'Brand', particles: 'Partikel', equalizer: 'Equalizer', stats: 'Stats', ticker: 'Ticker', splitflap: 'Klapptafel', neon: 'Neon', wave: 'Welle', swiss: 'Swiss' };
+        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', brand: 'Brand', particles: 'Partikel', equalizer: 'Equalizer', stats: 'Stats', ticker: 'Ticker', splitflap: 'Klapptafel', neon: 'Neon', wave: 'Welle', swiss: 'Swiss', audiolizer: 'Audiolizer', flowfield: 'Flowfield', predictions: 'Tipps' };
         let rotation = {};
         function renderRotation(r) {
             rotation = r || {};
@@ -370,6 +390,8 @@
         debounce('#adOrgName', v => ({ ad: { orgName: v } }));
         debounce('#adTagline', v => ({ ad: { tagline: v } }));
         debounce('#adUrl',     v => ({ ad: { url: v } }));
+        debounce('#predQuestion', v => ({ predictions: { question: v } }));
+        $('#clearPreds').onclick = () => { socket.emit('breakPredictionsClear'); toast('Tipps zurückgesetzt', 'info', 1000); };
 
         // Toast (reused from controller)
         function toast(msg, type = 'info', dur = 2000) {
