@@ -56,6 +56,40 @@
         }
         .field input:focus { outline: none; border-color: var(--border-hl); }
         .field-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+
+        /* Slide rotation controls */
+        .slide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .slide-toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px; border-radius: 12px;
+            background: var(--card-up); border: 1px solid var(--border);
+            font-size: 13px; font-weight: 600; color: var(--text-2);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .slide-toggle.on { color: var(--text); border-color: var(--border-hl); background: var(--card); }
+        .slide-toggle .pin {
+            width: 22px; height: 22px; border-radius: 11px;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text-3); display: flex; align-items: center; justify-content: center;
+            font-size: 11px; cursor: pointer; margin-left: 8px;
+        }
+        .slide-toggle .pin.on { background: var(--accent); border-color: var(--accent); color: #000; }
+        .dwell-row { display: flex; gap: 8px; margin-top: 10px; }
+        .dwell-row .chip { flex: 1; padding: 12px 0; font-size: 13px; }
+
+        /* Sponsor upload */
+        .ad-upload {
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            padding: 16px; border: 1px dashed var(--border-hl); border-radius: 14px; margin: 8px 0;
+        }
+        .ad-preview {
+            width: 100%; max-height: 120px; object-fit: contain; border-radius: 8px;
+            background: var(--card-up); display: none;
+        }
+        .ad-preview.show { display: block; }
+        .ad-pick { padding: 12px 24px; border-radius: 100px; border: none; background: var(--accent); color: #000; font-weight: 700; font-size: 13px; cursor: pointer; }
+        .ad-pick:active { transform: scale(0.96); }
+        .ad-file { display: none; }
     </style>
 </head>
 <body>
@@ -146,6 +180,40 @@
             </div>
         </div>
 
+        <!-- Slide rotation -->
+        <div class="section">
+            <div class="section-title">Slides (rotation)</div>
+            <div class="slide-grid" id="slideGrid"></div>
+            <div class="dwell-row">
+                <button class="chip" data-dwell="8000">8s</button>
+                <button class="chip" data-dwell="12000">12s</button>
+                <button class="chip" data-dwell="16000">16s</button>
+                <button class="chip" data-dwell="20000">20s</button>
+            </div>
+        </div>
+
+        <!-- Sponsor ad -->
+        <div class="section">
+            <div class="section-title">Sponsor</div>
+            <div class="ad-upload">
+                <img class="ad-preview" id="adPreview" alt="">
+                <input class="ad-file" id="adFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                <button class="ad-pick" id="adPick" type="button">Logo hochladen</button>
+            </div>
+            <div class="field">
+                <div class="field-lbl">Organisation / Name</div>
+                <input id="adOrgName" type="text" maxlength="48" placeholder="z.B. TuS Musterhausen">
+            </div>
+            <div class="field">
+                <div class="field-lbl">Tagline (optional)</div>
+                <input id="adTagline" type="text" maxlength="80" placeholder="Dein Verein im Herzen der Stadt">
+            </div>
+            <div class="field">
+                <div class="field-lbl">Link für QR-Code (optional)</div>
+                <input id="adUrl" type="text" maxlength="200" placeholder="https://...">
+            </div>
+        </div>
+
     </main>
 
     <div class="toast-box" id="toastBox"></div>
@@ -198,6 +266,8 @@
             syncUnlessFocused('#matchVal', (s.matchClock || {}).display || '');
             syncUnlessFocused('#title', s.title || '');
             syncUnlessFocused('#message', s.message || '');
+            renderRotation(s.rotation);
+            renderAd(s.ad);
         }
         function syncUnlessFocused(sel, val) {
             const el = $(sel); if (document.activeElement !== el) el.value = val;
@@ -236,6 +306,70 @@
         debounce('#matchVal', v => ({ matchClock: { display: v } }));
         debounce('#title',    v => ({ title: v }));
         debounce('#message',  v => ({ message: v }));
+
+        // ── Slide rotation ──
+        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', brand: 'Brand' };
+        let rotation = {};
+        function renderRotation(r) {
+            rotation = r || {};
+            const active = r.active || {};
+            const grid = $('#slideGrid');
+            grid.innerHTML = '';
+            Object.keys(SLIDE_LABELS).forEach(k => {
+                const row = document.createElement('div');
+                row.className = 'slide-toggle' + (active[k] ? ' on' : '');
+                row.innerHTML = '<span>' + SLIDE_LABELS[k] + '</span>';
+                const pin = document.createElement('button');
+                pin.className = 'pin' + (r.pinned === k ? ' on' : '');
+                pin.textContent = r.pinned === k ? '✓' : 'pin';
+                pin.onclick = e => {
+                    e.stopPropagation();
+                    const next = r.pinned === k ? null : k;
+                    socket.emit('breakRotation', { pinned: next });
+                };
+                row.appendChild(pin);
+                row.onclick = () => socket.emit('breakRotation', { active: { [k]: !active[k] } });
+                grid.appendChild(row);
+            });
+        }
+        document.querySelectorAll('[data-dwell]').forEach(b => b.onclick = () => {
+            socket.emit('breakRotation', { dwellMs: parseInt(b.dataset.dwell, 10) });
+            toast('Dwell: ' + (parseInt(b.dataset.dwell,10)/1000) + 's', 'info', 1000);
+        });
+
+        // ── Sponsor ──
+        function renderAd(ad) {
+            ad = ad || {};
+            syncUnlessFocused('#adOrgName', ad.orgName || '');
+            syncUnlessFocused('#adTagline', ad.tagline || '');
+            syncUnlessFocused('#adUrl', ad.url || '');
+            const prev = $('#adPreview');
+            if (ad.logoFile) { prev.src = '/break-ads/' + ad.logoFile + '?t=' + Date.now(); prev.classList.add('show'); }
+            else { prev.classList.remove('show'); prev.src = ''; }
+        }
+        $('#adPick').onclick = () => $('#adFile').click();
+        $('#adFile').onchange = async e => {
+            const f = e.target.files[0]; if (!f) return;
+            if (f.size > 8 * 1024 * 1024) { toast('Datei zu gross (max 8 MB)', 'err'); return; }
+            const reader = new FileReader();
+            reader.onload = async () => {
+                toast('Lade Logo...', 'info', 1500);
+                try {
+                    const r = await fetch('/api/break-ad/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: reader.result }),
+                    });
+                    const j = await r.json();
+                    if (!r.ok || !j.ok) throw new Error(j.error || 'Upload fehlgeschlagen');
+                    toast('Logo gespeichert', 'ok');
+                } catch (err) { toast(err.message, 'err'); }
+            };
+            reader.readAsDataURL(f);
+        };
+        debounce('#adOrgName', v => ({ ad: { orgName: v } }));
+        debounce('#adTagline', v => ({ ad: { tagline: v } }));
+        debounce('#adUrl',     v => ({ ad: { url: v } }));
 
         // Toast (reused from controller)
         function toast(msg, type = 'info', dur = 2000) {

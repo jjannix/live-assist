@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
@@ -201,6 +203,47 @@ app.post('/api/config', (req, res) => {
 
 app.get('/api/network', (req, res) => {
     res.json({ urls: lanUrls() });
+});
+
+// ── Break-screen sponsor ad upload ────────────────────────────────
+// The operator picks a logo file on their phone; the browser reads it
+// as base64 and POSTs it here. We decode and save to public/break-ads/
+// (served statically by Express), then point break-state at the file.
+// No multer, no multipart — matches the project's no-extra-deps ethos.
+const BREAK_ADS_DIR = path.join(__dirname, 'public', 'break-ads');
+try { fs.mkdirSync(BREAK_ADS_DIR, { recursive: true }); } catch (_) { /* exists */ }
+
+app.post('/api/break-ad/upload', (req, res) => {
+    try {
+        const { image } = (req.body || {});
+        if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+            return res.status(400).json({ ok: false, error: 'Expected a data:image/* URL' });
+        }
+        const m = image.match(/^data:image\/(png|jpe?g|webp|svg\+xml);base64,(.+)$/);
+        if (!m) return res.status(400).json({ ok: false, error: 'Unsupported image format' });
+        const ext = m[1] === 'jpeg' ? 'jpg' : (m[1] === 'svg+xml' ? 'svg' : m[1]);
+        const buf = Buffer.from(m[2], 'base64');
+        // 8 MB hard cap — beamer logos don't need more, and this keeps
+        // a typo'd upload from filling memory.
+        if (buf.length > 8 * 1024 * 1024) {
+            return res.status(413).json({ ok: false, error: 'Image too large (max 8 MB)' });
+        }
+        const filename = 'ad-' + Date.now() + '.' + ext;
+        fs.writeFileSync(path.join(BREAK_ADS_DIR, filename), buf);
+        // Prune older ad-* files so the dir doesn't grow unbounded
+        try {
+            for (const f of fs.readdirSync(BREAK_ADS_DIR)) {
+                if (f.startsWith('ad-') && f !== filename) {
+                    try { fs.unlinkSync(path.join(BREAK_ADS_DIR, f)); } catch (_) {}
+                }
+            }
+        } catch (_) {}
+        breakState.setAdLogo(filename);
+        res.json({ ok: true, logoFile: filename, url: '/break-ads/' + filename });
+    } catch (e) {
+        console.error('Ad upload failed:', e.message);
+        res.status(500).json({ ok: false, error: e.message });
+    }
 });
 
 // Re-read .env and re-initialise OBS + audio so edits take effect
@@ -538,6 +581,8 @@ io.on('connection', async socket => {
             case 'duration':breakState.setDuration(d.sec); break;
         }
     });
+    socket.on('breakRotation', patch => breakState.setRotation(patch));
+    socket.on('breakAd',       patch => breakState.setAd(patch));
 
     socket.on('disconnect', () => {
         console.log('Client disconnected');

@@ -7,123 +7,31 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/broadcast.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
     <style>
         /*
          * ════════════════════════════════════════════════════════════════
-         *  jnk Live Assist · Break screen
+         *  jnk Live Assist · Break screen (slide deck)
          *  Audience-facing halftime graphic for OBS Browser Source @ 1080p.
          *
-         *  Design thesis:
-         *   - Layered atmosphere (base gradient + drifting orbs + vignette
-         *     + film grain) instead of flat fill. Grain is the cheap trick
-         *     that makes a graphic read as "broadcast" rather than "CSS".
-         *   - Space Grotesk for the display monument, Inter for everything
-         *     else. Tabular numerics everywhere a number lives.
-         *   - The countdown is the hero; title/caption/message orbit it.
-         *   - A structured lower-third bar (accent edge, segmented) carries
-         *     the match context — Sky Sports / DAZN cue.
-         *   - Motion budget: two slow-drifting orbs, one breathing dot, a
-         *     staggered entrance, a score-change pulse, an elegant done
-         *     glow. No flashing. Restraint reads as premium.
-         *   - Stats (Sofascore etc.) are composited as a SEPARATE OBS
-         *     browser source wherever you like — this page doesn't reserve
-         *     a hole for them, so it's a complete composition on its own.
+         *  Atmosphere + type + motion live in broadcast.css (shared with
+         *  any future match-day view). This file holds the SLIDE DECK:
+         *  six compositions that crossfade on a rotation timer, all
+         *  reading from the same break-state (so a goal or message lands
+         *  on whatever slide is showing). The operator can pin one slide,
+         *  toggle slides off, or set the dwell.
+         *
+         *  Deck:
+         *    1. clock   — numeral hero countdown
+         *    2. radial  — countdown as a depleting ring
+         *    3. score   — editorial scoreboard split
+         *    4. message — full-screen pushed text
+         *    5. ad      — single sponsor (logo + name + tagline + QR)
+         *    6. brand   — pure attract motion (the breather)
          * ════════════════════════════════════════════════════════════════
          */
 
-        :root {
-            /* Warm-dark base — beamers murder pure black, so we go just
-               off-black with a hint of warmth for depth. */
-            --bg-0: #07070c;
-            --bg-1: #0d0d16;
-            --panel: rgba(16, 16, 26, 0.72);
-
-            /* Ink scale */
-            --ink-0: #f6f6fb;
-            --ink-1: #b8b8c8;
-            --ink-2: #6e6e80;
-            --ink-3: #3a3a48;
-
-            /* Brand + accents */
-            --accent: #7c6aff;
-            --accent-2: #4f7cff;      /* cool blue, harmonises the orbs */
-            --accent-glow: rgba(124, 106, 255, 0.35);
-            --warm: #f5a623;          /* amber for LIVE / countdown-done */
-            --warm-glow: rgba(245, 166, 35, 0.4);
-
-            --line: rgba(255, 255, 255, 0.08);
-            --line-2: rgba(255, 255, 255, 0.14);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body {
-            width: 100%; height: 100%; overflow: hidden;
-            background: var(--bg-0);
-        }
-        body {
-            font-family: 'Inter', -apple-system, system-ui, sans-serif;
-            color: var(--ink-0);
-            -webkit-font-smoothing: antialiased;
-            text-rendering: optimizeLegibility;
-        }
-
-        /* ═══════ Atmosphere layers ═══════
-           Stacked, pointer-events:none, sit behind all content. */
-        .atmos {
-            position: fixed; inset: 0; z-index: 0;
-            background:
-                radial-gradient(140% 100% at 50% 120%, var(--bg-1) 0%, var(--bg-0) 60%),
-                linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
-        }
-        .orb {
-            position: fixed; z-index: 0; pointer-events: none;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.55;
-            will-change: transform;
-        }
-        .orb.a {
-            width: 70vw; height: 70vw; max-width: 1100px; max-height: 1100px;
-            top: -25%; left: -15%;
-            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
-            animation: drift-a 58s ease-in-out infinite;
-        }
-        .orb.b {
-            width: 60vw; height: 60vw; max-width: 950px; max-height: 950px;
-            bottom: -30%; right: -20%;
-            background: radial-gradient(circle, rgba(79, 124, 255, 0.28) 0%, transparent 65%);
-            animation: drift-b 72s ease-in-out infinite;
-        }
-        @keyframes drift-a {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50%      { transform: translate(8vw, 6vh) scale(1.12); }
-        }
-        @keyframes drift-b {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50%      { transform: translate(-7vw, -5vh) scale(1.08); }
-        }
-        /* Vignette — focus the eye to centre */
-        .vignette {
-            position: fixed; inset: 0; z-index: 1; pointer-events: none;
-            background: radial-gradient(120% 90% at 50% 45%, transparent 50%, rgba(0,0,0,0.55) 100%);
-        }
-        /* Film grain — feTurbulence, no asset, scales infinitely */
-        .grain {
-            position: fixed; inset: -50%; z-index: 2; pointer-events: none;
-            opacity: 0.045; mix-blend-mode: overlay;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-            animation: grain-shift 8s steps(6) infinite;
-        }
-        @keyframes grain-shift {
-            0%   { transform: translate(0, 0); }
-            20%  { transform: translate(-3%, 2%); }
-            40%  { transform: translate(2%, -3%); }
-            60%  { transform: translate(-2%, -2%); }
-            80%  { transform: translate(3%, 1%); }
-            100% { transform: translate(0, 0); }
-        }
-
-        /* ═══════ Stage layout ═══════ */
         .stage {
             position: relative; z-index: 3;
             display: grid; grid-template-rows: auto 1fr auto;
@@ -131,7 +39,8 @@
             padding: clamp(40px, 5vw, 88px) clamp(48px, 6vw, 110px);
         }
 
-        /* ── Top bar: brand + wall clock ── */
+        /* Persistent top bar + lower-third sit outside the deck so they
+           stay anchored while slides crossfade between them. */
         .top {
             display: flex; justify-content: space-between; align-items: center;
         }
@@ -152,50 +61,44 @@
             border: 1px solid var(--accent-glow);
             animation: ring 2.6s ease-out infinite;
         }
-        @keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
-        @keyframes ring {
-            0%   { transform: scale(0.8); opacity: 0.8; }
-            100% { transform: scale(2.2); opacity: 0; }
-        }
         .wallclock {
             font-size: clamp(14px, 1.1vw, 18px); font-weight: 600;
             color: var(--ink-2); font-variant-numeric: tabular-nums;
             letter-spacing: 1px;
         }
 
-        /* ── Centre monument ── */
-        .monument {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: clamp(16px, 2vw, 32px);
-            text-align: center;
+        /* The deck fills the middle row. Each slide centres its content. */
+        .deck-wrap { position: relative; min-height: 0; }
+        .slide {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; gap: clamp(16px, 2vw, 32px);
+            padding: 24px 0;
         }
+
+        /* ── Shared slide pieces ── */
         .title {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: clamp(48px, 6.5vw, 96px);
+            font-family: var(--font-display);
+            font-size: clamp(44px, 5.5vw, 84px);
             font-weight: 700; letter-spacing: 0.04em;
             line-height: 1; text-transform: uppercase;
             background: linear-gradient(180deg, var(--ink-0) 0%, var(--ink-1) 100%);
             -webkit-background-clip: text; background-clip: text;
             -webkit-text-fill-color: transparent;
-            position: relative;
         }
-        /* Thin accent rule under the title */
-        .title::after {
-            content: ''; position: absolute; left: 50%; bottom: -14px;
-            transform: translateX(-50%);
-            width: 56px; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        .caption {
+            font-size: clamp(15px, 1.4vw, 22px);
+            font-weight: 600; letter-spacing: 0.4em; text-transform: uppercase;
+            color: var(--ink-2);
         }
+        .caption.done { color: var(--warm); }
 
-        /* THE countdown — the centrepiece */
+        /* ── Slide: clock ── */
         .clock {
-            font-family: 'Space Grotesk', sans-serif;
+            font-family: var(--font-display);
             font-size: clamp(140px, 19vw, 300px);
-            font-weight: 700;
-            letter-spacing: -0.04em;
-            line-height: 0.9;
-            font-variant-numeric: tabular-nums;
-            color: var(--ink-0);
+            font-weight: 700; letter-spacing: -0.04em; line-height: 0.9;
+            font-variant-numeric: tabular-nums; color: var(--ink-0);
             text-shadow: 0 0 60px rgba(124, 106, 255, 0.12);
             transition: color 0.6s ease, text-shadow 0.6s ease;
         }
@@ -204,28 +107,129 @@
             text-shadow: 0 0 80px var(--warm-glow);
             animation: done-pulse 1.8s ease-in-out infinite;
         }
-        @keyframes done-pulse {
-            0%, 100% { opacity: 1; }
-            50%      { opacity: 0.78; }
+        @keyframes done-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.78; } }
+        .message-inline {
+            font-size: clamp(20px, 2.2vw, 34px);
+            font-weight: 400; font-style: italic; color: var(--ink-1);
+            max-width: 24ch; line-height: 1.3; min-height: 1em;
         }
-        .caption {
-            font-size: clamp(15px, 1.4vw, 22px);
-            font-weight: 600; letter-spacing: 0.4em; text-transform: uppercase;
-            color: var(--ink-2);
-        }
-        .caption.live { color: var(--ink-1); }
-        .caption.done { color: var(--warm); }
 
-        .message {
-            font-size: clamp(22px, 2.4vw, 38px);
-            font-weight: 400; font-style: italic;
-            color: var(--ink-1);
-            max-width: 22ch; line-height: 1.3;
-            min-height: 1em;
-            opacity: 0;
-            transition: opacity 0.5s ease;
+        /* ── Slide: radial ── */
+        .radial-wrap { position: relative; width: clamp(260px, 32vw, 460px); aspect-ratio: 1; }
+        .radial-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .radial-bg { fill: none; stroke: var(--line); stroke-width: 10; }
+        .radial-fg {
+            fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round;
+            transition: stroke-dashoffset 0.9s linear, stroke 0.6s ease;
+            filter: drop-shadow(0 0 12px var(--accent-glow));
         }
-        .message.show { opacity: 0.92; }
+        .radial-fg.done { stroke: var(--warm); filter: drop-shadow(0 0 16px var(--warm-glow)); }
+        .radial-center {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+        }
+        .radial-num {
+            font-family: var(--font-display);
+            font-size: clamp(56px, 7vw, 110px); font-weight: 700;
+            letter-spacing: -0.03em; line-height: 1;
+            font-variant-numeric: tabular-nums; color: var(--ink-0);
+        }
+        .radial-num.done { color: var(--warm); }
+
+        /* ── Slide: score (editorial split) ── */
+        .scoreboard { display: flex; flex-direction: column; align-items: center; gap: 28px; width: 100%; }
+        .score-eyebrow {
+            font-size: clamp(13px, 1.1vw, 17px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--ink-2);
+        }
+        .score-row {
+            display: flex; align-items: center; gap: clamp(28px, 4vw, 64px);
+            font-family: var(--font-display);
+        }
+        .score-side { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
+        .score-side .team {
+            font-size: clamp(20px, 2vw, 32px); font-weight: 600;
+            color: var(--ink-1); text-transform: uppercase; letter-spacing: 0.05em;
+            max-width: 8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .score-side .num {
+            font-size: clamp(72px, 9vw, 140px); font-weight: 700;
+            color: var(--ink-0); font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .score-side .num.pulse { animation: num-pulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes num-pulse {
+            0%   { transform: scale(1);    color: var(--ink-0); }
+            35%  { transform: scale(1.2);  color: var(--accent); }
+            100% { transform: scale(1);    color: var(--ink-0); }
+        }
+        .score-colon { font-size: clamp(48px, 6vw, 96px); font-weight: 500; color: var(--ink-3); }
+
+        /* ── Slide: message (full-screen type) ── */
+        .msg-hero {
+            font-family: var(--font-display);
+            font-size: clamp(48px, 6.5vw, 104px);
+            font-weight: 700; line-height: 1.05; letter-spacing: -0.01em;
+            max-width: 18ch; color: var(--ink-0);
+        }
+        .msg-eyebrow {
+            font-size: clamp(13px, 1.1vw, 17px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--accent);
+        }
+        .msg-empty { color: var(--ink-3); font-style: italic; }
+
+        /* ── Slide: ad (single sponsor) ── */
+        .ad-wrap { display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 2.4vw, 36px); max-width: 900px; }
+        .ad-logo-box {
+            width: clamp(180px, 22vw, 340px); max-height: clamp(180px, 22vw, 340px);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ad-logo-box img { max-width: 100%; max-height: clamp(180px, 22vw, 340px); object-fit: contain; }
+        .ad-name {
+            font-family: var(--font-display);
+            font-size: clamp(36px, 4.5vw, 72px); font-weight: 700;
+            letter-spacing: 0.02em; color: var(--ink-0); text-transform: uppercase;
+            line-height: 1;
+        }
+        .ad-tag {
+            font-size: clamp(18px, 2vw, 30px); font-weight: 400; font-style: italic;
+            color: var(--ink-1); max-width: 32ch; line-height: 1.3;
+        }
+        .ad-qr-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+        .ad-qr-row canvas {
+            border-radius: 12px; background: #fff; padding: 8px;
+            width: clamp(90px, 9vw, 130px) !important; height: clamp(90px, 9vw, 130px) !important;
+        }
+        .ad-qr-cap { font-size: clamp(13px, 1.1vw, 17px); font-weight: 600; color: var(--ink-2); text-align: left; line-height: 1.4; }
+        .ad-qr-cap strong { color: var(--ink-0); font-weight: 700; display: block; }
+
+        /* ── Slide: brand (attract) ── */
+        .brand-hero { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+        .brand-glyph {
+            position: relative; width: clamp(120px, 14vw, 200px); aspect-ratio: 1;
+            border-radius: 50%;
+            border: 2px solid var(--line-2);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .brand-glyph::before {
+            content: ''; position: absolute; inset: -2px; border-radius: 50%;
+            border: 2px solid transparent;
+            border-top-color: var(--accent); border-right-color: var(--accent-2);
+            animation: spin 6s linear infinite;
+        }
+        .brand-glyph .core {
+            width: 40%; height: 40%; border-radius: 50%;
+            background: var(--accent); box-shadow: 0 0 40px var(--accent-glow);
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .brand-word {
+            font-family: var(--font-display);
+            font-size: clamp(40px, 5vw, 80px); font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-0);
+        }
+        .brand-sub {
+            font-size: clamp(14px, 1.2vw, 18px); font-weight: 600;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--ink-2);
+        }
 
         /* ── Lower-third data strip ── */
         .lower {
@@ -238,89 +242,31 @@
             backdrop-filter: blur(6px);
             -webkit-backdrop-filter: blur(6px);
         }
-        /* Accent edge on top */
         .lower::before {
             content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px;
             background: linear-gradient(90deg,
                 transparent 0%, var(--accent) 20%, var(--accent-2) 50%, var(--accent) 80%, transparent 100%);
             opacity: 0.7;
         }
-        .seg {
-            display: flex; align-items: center; gap: 16px;
-            padding: clamp(18px, 1.8vw, 28px) clamp(22px, 2.2vw, 36px);
-        }
+        .seg { display: flex; align-items: center; gap: 16px; padding: clamp(18px, 1.8vw, 28px) clamp(22px, 2.2vw, 36px); }
         .seg + .seg { border-left: 1px solid var(--line); }
-        .seg-label {
-            font-size: clamp(10px, 0.8vw, 12px); font-weight: 700;
-            letter-spacing: 0.25em; text-transform: uppercase; color: var(--ink-2);
-        }
-        .seg-val {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: clamp(22px, 2.2vw, 34px); font-weight: 600;
-            color: var(--ink-0); font-variant-numeric: tabular-nums;
-            line-height: 1;
-        }
+        .seg-label { font-size: clamp(10px, 0.8vw, 12px); font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: var(--ink-2); }
+        .seg-val { font-family: var(--font-display); font-size: clamp(22px, 2.2vw, 34px); font-weight: 600; color: var(--ink-0); font-variant-numeric: tabular-nums; line-height: 1; }
+        .live { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: clamp(11px, 0.9vw, 14px); font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; color: var(--warm); }
+        .live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warm); box-shadow: 0 0 12px var(--warm-glow); animation: breathe 1.4s ease-in-out infinite; }
 
-        /* Score block */
-        .score {
-            display: flex; align-items: center; gap: clamp(12px, 1.2vw, 20px);
-            font-family: 'Space Grotesk', sans-serif;
+        /* Slide indicator (tiny dots, bottom-right) — shows which slide
+           is live and how many are in the rotation. Subtle broadcast cue. */
+        .indicators {
+            position: fixed; right: clamp(20px, 2vw, 32px); bottom: clamp(12px, 1.4vw, 20px);
+            z-index: 4; display: flex; gap: 6px; opacity: 0.5;
         }
-        .score .team {
-            font-size: clamp(14px, 1.2vw, 18px); font-weight: 600;
-            color: var(--ink-1); text-transform: uppercase; letter-spacing: 0.05em;
-            max-width: 9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .score .num {
-            font-size: clamp(34px, 3.6vw, 56px); font-weight: 700;
-            color: var(--ink-0); font-variant-numeric: tabular-nums; line-height: 1;
-            min-width: 0.6em; text-align: center;
-            transition: transform 0.15s ease, color 0.45s ease;
-        }
-        .score .num.pulse {
-            animation: num-pulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        @keyframes num-pulse {
-            0%   { transform: scale(1);    color: var(--ink-0); }
-            35%  { transform: scale(1.25); color: var(--accent); }
-            100% { transform: scale(1);    color: var(--ink-0); }
-        }
-        .score .colon {
-            font-size: clamp(28px, 3vw, 48px); font-weight: 500; color: var(--ink-2);
-        }
-
-        /* LIVE indicator */
-        .live {
-            margin-left: auto;
-            display: flex; align-items: center; gap: 10px;
-            font-size: clamp(11px, 0.9vw, 14px); font-weight: 800;
-            letter-spacing: 0.3em; text-transform: uppercase; color: var(--warm);
-        }
-        .live .dot {
-            width: 9px; height: 9px; border-radius: 50%; background: var(--warm);
-            box-shadow: 0 0 12px var(--warm-glow);
-            animation: breathe 1.4s ease-in-out infinite;
-        }
-
-        /* ═══════ Entrance ═══════ */
-        .enter { opacity: 0; transform: translateY(16px); animation: enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-        .d1 { animation-delay: 0.05s; }
-        .d2 { animation-delay: 0.18s; }
-        .d3 { animation-delay: 0.30s; }
-        .d4 { animation-delay: 0.42s; }
-        .d5 { animation-delay: 0.54s; }
-        .d6 { animation-delay: 0.66s; }
-        @keyframes enter { to { opacity: 1; transform: none; } }
-
-        /* Reduce motion: honour the OS preference */
-        @media (prefers-reduced-motion: reduce) {
-            .orb, .grain, .brand .mark, .brand .mark::after, .clock.done, .live .dot { animation: none; }
-            .enter { opacity: 1; transform: none; animation: none; }
-        }
+        .indicators .pip { width: 6px; height: 6px; border-radius: 3px; background: var(--ink-3); transition: background 0.3s, width 0.3s; }
+        .indicators .pip.on { background: var(--accent); width: 18px; }
     </style>
 </head>
 <body>
-    <!-- Atmosphere -->
+    <!-- Atmosphere (shared, from broadcast.css) -->
     <div class="atmos"></div>
     <div class="orb a"></div>
     <div class="orb b"></div>
@@ -328,7 +274,7 @@
     <div class="grain"></div>
 
     <main class="stage">
-        <!-- Top bar -->
+        <!-- Persistent top bar -->
         <header class="top enter d1">
             <div class="brand">
                 <span class="mark"></span>
@@ -337,46 +283,105 @@
             <div class="wallclock" id="wallclock">--:--</div>
         </header>
 
-        <!-- Monument -->
-        <section class="monument">
-            <h1 class="title enter d2" id="title">HALBZEIT</h1>
-            <div class="clock enter d3" id="clock">15:00</div>
-            <div class="caption enter d4" id="caption">bis Anpfiff</div>
-            <div class="message enter d5" id="message"></div>
-        </section>
+        <!-- Slide deck -->
+        <div class="deck-wrap">
+            <!-- 1. Clock -->
+            <section class="slide" data-slide="clock">
+                <h2 class="title" id="title">HALBZEIT</h2>
+                <div class="clock" id="clock">15:00</div>
+                <div class="caption" id="caption">bis Anpfiff</div>
+                <div class="message-inline" id="message"></div>
+            </section>
 
-        <!-- Lower-third data strip -->
+            <!-- 2. Radial -->
+            <section class="slide" data-slide="radial">
+                <div class="radial-wrap">
+                    <svg viewBox="0 0 200 200">
+                        <circle class="radial-bg" cx="100" cy="100" r="92"></circle>
+                        <circle class="radial-fg" id="radialFg" cx="100" cy="100" r="92"></circle>
+                    </svg>
+                    <div class="radial-center">
+                        <div class="radial-num" id="radialNum">15:00</div>
+                        <div class="caption" id="radialCap">bis Anpfiff</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Score -->
+            <section class="slide" data-slide="score">
+                <div class="scoreboard">
+                    <div class="score-eyebrow" id="scoreEyebrow">Aktueller Stand</div>
+                    <div class="score-row">
+                        <div class="score-side">
+                            <span class="team" id="homeName"></span>
+                            <span class="num" id="homeScore">0</span>
+                        </div>
+                        <span class="score-colon">:</span>
+                        <div class="score-side">
+                            <span class="num" id="awayScore">0</span>
+                            <span class="team" id="awayName"></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Message -->
+            <section class="slide" data-slide="message">
+                <div class="msg-eyebrow">Durchsage</div>
+                <div class="msg-hero" id="msgHero">—</div>
+            </section>
+
+            <!-- 5. Ad (single sponsor) -->
+            <section class="slide" data-slide="ad">
+                <div class="ad-wrap" id="adWrap">
+                    <div class="ad-logo-box" id="adLogoBox" hidden><img id="adLogo" alt=""></div>
+                    <div class="ad-name" id="adName"></div>
+                    <div class="ad-tag" id="adTag"></div>
+                    <div class="ad-qr-row" id="adQrRow" hidden>
+                        <canvas id="adQr"></canvas>
+                        <div class="ad-qr-cap"><strong>Scan mich</strong><span id="adUrl"></span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. Brand (attract) -->
+            <section class="slide" data-slide="brand">
+                <div class="brand-hero">
+                    <div class="brand-glyph"><div class="core"></div></div>
+                    <div class="brand-word">jnk</div>
+                    <div class="brand-sub">Live Assist</div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Persistent lower-third -->
         <footer class="lower enter d6">
             <div class="seg" id="segMatch">
                 <span class="seg-label" id="matchLbl">HT</span>
                 <span class="seg-val" id="matchVal">—</span>
             </div>
             <div class="seg" id="segScore">
-                <div class="score">
-                    <span class="team" id="homeName"></span>
-                    <span class="num" id="homeScore">0</span>
-                    <span class="colon">:</span>
-                    <span class="num" id="awayScore">0</span>
-                    <span class="team" id="awayName"></span>
-                </div>
+                <span class="seg-label" id="lowerScoreLbl">Stand</span>
+                <span class="seg-val" id="lowerScore">0:0</span>
             </div>
             <div class="seg" style="flex:1">
-                <div class="live">
-                    <span class="dot"></span>
-                    <span>Break</span>
-                </div>
+                <div class="live"><span class="dot"></span><span>Break</span></div>
             </div>
         </footer>
     </main>
+
+    <!-- Rotation indicator -->
+    <div class="indicators" id="indicators" hidden></div>
 
     <script>
     (() => {
         'use strict';
         const $ = s => document.querySelector(s);
+        const $$ = s => document.querySelectorAll(s);
         const socket = io();
 
-        // Previous score, so we can pulse only the side that changed.
         let prev = { home: 0, away: 0 };
+        let state = {};
 
         function pad(n) { return String(n).padStart(2, '0'); }
         function fmt(sec) {
@@ -385,84 +390,177 @@
             if (m >= 60) { const h = Math.floor(m / 60); return pad(h) + ':' + pad(m % 60) + ':' + pad(s); }
             return pad(m) + ':' + pad(s);
         }
+        function liveRemaining(t) {
+            if (!t || !t.endsAt) return t.remainingSec || 0;
+            return Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
+        }
+        function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
 
-        function renderClock(remaining, running) {
-            const el = $('#clock');
-            el.textContent = fmt(remaining);
+        // ── Clock + radial rendering ──
+        const RAD_R = 92, RAD_C = 2 * Math.PI * RAD_R;
+        const radialFg = $('#radialFg');
+        radialFg.style.strokeDasharray = RAD_C;
+        radialFg.style.strokeDashoffset = 0;
+
+        function renderClocks(remaining, running, duration) {
             const done = remaining <= 0;
-            el.classList.toggle('done', done);
+            // Numeral clock
+            const cEl = $('#clock');
+            cEl.textContent = fmt(remaining);
+            cEl.classList.toggle('done', done);
             const cap = $('#caption');
             cap.classList.toggle('done', done);
-            cap.classList.toggle('live', running && !done);
-            cap.textContent = done ? 'Anpfiff' : (running ? 'bis Anpfiff' : (remaining <= 0 ? 'Anpfiff' : 'pausiert'));
+            cap.textContent = done ? 'Anpfiff' : (running ? 'bis Anpfiff' : 'pausiert');
+            // Radial ring: full when remaining == duration, empty at 0
+            const frac = duration > 0 ? Math.min(1, Math.max(0, remaining / duration)) : 0;
+            radialFg.style.strokeDashoffset = RAD_C * (1 - frac);
+            radialFg.classList.toggle('done', done);
+            $('#radialNum').textContent = fmt(remaining);
+            $('#radialNum').classList.toggle('done', done);
+            $('#radialCap').textContent = done ? 'Anpfiff' : (running ? 'bis Anpfiff' : 'pausiert');
         }
 
+        // ── Full state render ──
         function render(s) {
+            state = s;
+            // Title + message
             $('#title').textContent = (s.title || 'HALBZEIT').toUpperCase();
+            const msg = s.message || '';
+            const mEl = $('#message');
+            mEl.textContent = msg;
+            mEl.style.visibility = msg ? 'visible' : 'hidden';
 
-            // Message — fade in/out gracefully
-            const msg = $('#message');
-            const txt = s.message || '';
-            if (txt) { msg.textContent = txt; msg.classList.add('show'); }
-            else { msg.classList.remove('show'); }
+            // Message slide
+            const msgHero = $('#msgHero');
+            if (msg) { msgHero.textContent = msg; msgHero.classList.remove('msg-empty'); }
+            else { msgHero.textContent = 'Keine Durchsage'; msgHero.classList.add('msg-empty'); }
 
-            // Frozen match clock
+            // Match clock
             $('#matchLbl').textContent = ((s.matchClock && s.matchClock.label) || 'HT').toUpperCase();
             $('#matchVal').textContent = (s.matchClock && s.matchClock.display) || '—';
 
             // Score
             const h = s.home || {}, a = s.away || {};
-            $('#homeName').textContent = h.name || '';
-            $('#awayName').textContent = a.name || '';
-
-            const hEl = $('#homeScore'), aEl = $('#awayScore');
+            $('#homeName').textContent = h.name || 'Heim';
+            $('#awayName').textContent = a.name || 'Gast';
             const hs = h.score != null ? h.score : 0;
             const as = a.score != null ? a.score : 0;
-            // Pulse the side that just changed — ack to the operator.
-            if (hs !== prev.home) pulse(hEl);
-            if (as !== prev.away) pulse(aEl);
-            hEl.textContent = hs;
-            aEl.textContent = as;
+            if (hs !== prev.home) pulse($('#homeScore'));
+            if (as !== prev.away) pulse($('#awayScore'));
+            $('#homeScore').textContent = hs;
+            $('#awayScore').textContent = as;
             prev.home = hs; prev.away = as;
+            $('#lowerScore').textContent = hs + ':' + as;
 
-            // Hide the score segment entirely when nothing's set, so a
-            // scoreless sport (or pre-kickoff) shows a clean strip.
-            const hasScore = (h.name || a.name) || (hs || as);
-            $('#segScore').style.display = hasScore ? '' : 'none';
+            // Ad
+            renderAd(s.ad || {});
 
-            // Timer snapshot for the local tick
-            window.__t = s.timer;
-
+            // Clocks
             const t = s.timer || {};
-            const remaining = t.running ? liveRemaining(t) : (t.remainingSec || 0);
-            renderClock(remaining, !!t.running);
+            const dur = t.durationSec || 1;
+            renderClocks(liveRemaining(t), !!t.running, dur);
+
+            // Rotation
+            applyRotation(s.rotation || {});
         }
 
-        function liveRemaining(t) {
-            if (!t || !t.endsAt) return t.remainingSec || 0;
-            return Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
+        function renderAd(ad) {
+            const hasName = !!(ad && ad.orgName);
+            $('#adName').textContent = (ad && ad.orgName) || '';
+            $('#adTag').textContent = (ad && ad.tagline) || '';
+            const logoBox = $('#adLogoBox');
+            if (ad && ad.logoFile) {
+                $('#adLogo').src = '/break-ads/' + ad.logoFile + '?t=' + Date.now();
+                logoBox.hidden = false;
+            } else { logoBox.hidden = true; }
+            const url = (ad && ad.url) || '';
+            const qrRow = $('#adQrRow');
+            if (url && window.QRCode) {
+                $('#adUrl').textContent = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                QRCode.toCanvas($('#adQr'), url, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
+                qrRow.hidden = false;
+            } else if (hasName) {
+                qrRow.hidden = true;
+            } else {
+                // No ad configured at all — show a placeholder so the slide
+                // isn't blank if it ends up in the rotation.
+                $('#adName').textContent = 'Dein Logo hier';
+                $('#adTag').textContent = 'Sponsor-Platz — in der App konfigurieren';
+                qrRow.hidden = true;
+            }
         }
-        function pulse(el) {
-            el.classList.remove('pulse');
-            void el.offsetWidth;        // reflow to restart the animation
-            el.classList.add('pulse');
+
+        // ── Rotation engine ──
+        let rotTimer = null;
+        let activeList = [];
+        let rotIndex = 0;
+
+        function applyRotation(r) {
+            const slides = r.slides || ['clock'];
+            const active = r.active || {};
+            const newList = slides.filter(k => active[k]);
+            // If the active set changed under us, snap back to slide 0
+            const same = newList.length === activeList.length && newList.every((k, i) => k === activeList[i]);
+            if (!same) { activeList = newList; rotIndex = 0; }
+            // Empty rotation → fall back to clock so the screen is never blank
+            if (activeList.length === 0) activeList = ['clock'];
+
+            // Build the indicator pips
+            const ind = $('#indicators');
+            ind.innerHTML = '';
+            activeList.forEach((k, i) => {
+                const pip = document.createElement('div');
+                pip.className = 'pip' + (i === rotIndex ? ' on' : '');
+                ind.appendChild(pip);
+            });
+            ind.hidden = activeList.length < 2;
+
+            // Pinning overrides rotation
+            const pinned = r.pinned;
+            if (pinned && activeList.includes(pinned)) {
+                showSlide(pinned);
+                clearTimeout(rotTimer); rotTimer = null;
+                return;
+            }
+            // Make sure the current slide is visible
+            showSlide(activeList[rotIndex] || 'clock');
+
+            // Schedule the next advance
+            clearTimeout(rotTimer);
+            const dwell = r.dwellMs || 12000;
+            if (activeList.length > 1) {
+                rotTimer = setTimeout(advance, dwell);
+            }
+        }
+
+        function advance() {
+            if (activeList.length === 0) return;
+            rotIndex = (rotIndex + 1) % activeList.length;
+            showSlide(activeList[rotIndex]);
+            // Refresh pips
+            $$('#indicators .pip').forEach((p, i) => p.classList.toggle('on', i === rotIndex));
+            const dwell = (state.rotation && state.rotation.dwellMs) || 12000;
+            rotTimer = setTimeout(advance, dwell);
+        }
+
+        function showSlide(name) {
+            $$('.slide').forEach(el => el.classList.toggle('active', el.dataset.slide === name));
         }
 
         socket.on('breakState', render);
+        socket.on('connect', () => socket.emit('breakStateGet'));
 
-        // Local tick — server is the clock authority but only emits on
-        // change; while running we update the display between broadcasts.
+        // Local clock tick — server is the authority but only emits on
+        // change; while running we keep the numerals/ring live between
+        // broadcasts (every 250ms is smooth enough at this scale).
         setInterval(() => {
-            const t = window.__t;
+            const t = state.timer;
             if (!t) return;
-            if (t.running) renderClock(liveRemaining(t), true);
+            if (t.running) renderClocks(liveRemaining(t), true, t.durationSec || 1);
         }, 250);
 
         // Wall clock
-        function wall() {
-            const d = new Date();
-            $('#wallclock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
-        }
+        function wall() { const d = new Date(); $('#wallclock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()); }
         wall(); setInterval(wall, 10000);
     })();
     </script>

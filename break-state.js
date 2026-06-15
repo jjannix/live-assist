@@ -35,6 +35,20 @@ const DEFAULTS = Object.freeze({
         endsAt: null,           // epoch ms; null when paused/reset
         remainingSec: DEFAULT_HALFTIME_SEC,
     },
+    // Slide rotation. The break screen cycles through active slides;
+    // `pinned` locks one (null = free rotation). `current` is the
+    // index into the active list — but the client owns the tick, so
+    // the server only persists the *config*, not the live pointer.
+    rotation: {
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true },
+        dwellMs: 12000,
+        pinned: null,
+    },
+    // Single sponsor ad. logoFile is a filename served from
+    // /break-ads/ (uploaded via POST /api/break-ad). Empty = no logo,
+    // the slide shows org name + tagline + QR only.
+    ad: { orgName: '', tagline: '', url: '', logoFile: '' },
 });
 
 let state = load();
@@ -170,6 +184,43 @@ function adjustTimer(deltaSec) {
     commit();
 }
 
+// ── rotation config ───────────────────────────────────────────────
+
+function setRotation(patch) {
+    if (!patch || typeof patch !== 'object') return;
+    const r = state.rotation;
+    if (patch.active && typeof patch.active === 'object') {
+        // Only flip known slides; ignore junk keys.
+        for (const k of Object.keys(r.active)) {
+            if (typeof patch.active[k] === 'boolean') r.active[k] = patch.active[k];
+        }
+    }
+    if (Number.isFinite(patch.dwellMs)) r.dwellMs = Math.max(3000, Math.min(60000, Math.trunc(patch.dwellMs)));
+    // pinned must name a known slide, or be null to free-rotate
+    if (patch.pinned === null || (typeof patch.pinned === 'string' && r.active.hasOwnProperty(patch.pinned))) {
+        r.pinned = patch.pinned;
+    }
+    commit();
+}
+
+// ── sponsor ad ────────────────────────────────────────────────────
+
+function setAd(patch) {
+    if (!patch || typeof patch !== 'object') return;
+    const ad = state.ad;
+    if (typeof patch.orgName === 'string')  ad.orgName = patch.orgName.slice(0, 48);
+    if (typeof patch.tagline === 'string')  ad.tagline = patch.tagline.slice(0, 80);
+    if (typeof patch.url === 'string')      ad.url = patch.url.slice(0, 200);
+    if (typeof patch.logoFile === 'string') ad.logoFile = patch.logoFile.slice(0, 120);
+    commit();
+}
+
+/** Set just the logo filename (called by the upload endpoint). */
+function setAdLogo(filename) {
+    state.ad.logoFile = String(filename || '').slice(0, 120);
+    commit();
+}
+
 // ── pub/sub ───────────────────────────────────────────────────────
 
 /** Subscribe to state changes. Returns an unsubscribe fn. */
@@ -181,6 +232,7 @@ function subscribe(fn) {
 module.exports = {
     get, update, setScore,
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
+    setRotation, setAd, setAdLogo,
     subscribe,
     DEFAULTS,
 };
