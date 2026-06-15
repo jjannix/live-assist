@@ -42,15 +42,25 @@ const DEFAULTS = Object.freeze({
     // Demo slides (particles/equalizer/stats/ticker) ship OFF so they
     // don't appear unless the operator opts in.
     rotation: {
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss', 'audiolizer', 'flowfield', 'predictions', 'standings', 'trivia', 'mosaic'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false, audiolizer: false, flowfield: false, predictions: false, standings: false, trivia: false, mosaic: false },
+        // The seven slides you've curated as the core deck. The other
+        // 13 are opt-in from the Slides (rotation) panel in the
+        // operator page.
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'flowfield', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss', 'audiolizer', 'predictions', 'standings', 'trivia', 'mosaic'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, flowfield: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false, audiolizer: false, predictions: false, standings: false, trivia: false, mosaic: false },
         dwellMs: 12000,
         pinned: null,
     },
     // Single sponsor ad. logoFile is a filename served from
     // /break-ads/ (uploaded via POST /api/break-ad). Empty = no logo,
     // the slide shows org name + tagline + QR only.
-    ad: { orgName: '', tagline: '', url: '', logoFile: '' },
+    // Sponsors are now a list. Each entry renders as a broadcast-style
+    // bumper that crossfades into the next on the ad slide. Migration
+    // from the old single-sponsor shape (orgName/tagline/url/logoFile)
+    // happens in reconcile() below.
+    ad: {
+        items: [],         // [{ orgName, tagline, url, logoFile }]
+        dwellMs: 8000,     // per-sponsor dwell when multiple are configured
+    },
     // Demo stat callouts for the 'stats' slide. Count up from 0 when the
     // slide appears. Operator-editable in a later pass; for now seeded
     // with plausible demo values so the visual reads immediately.
@@ -106,6 +116,7 @@ function load() {
         const parsed = JSON.parse(raw);
         const merged = merge(structuredClone(DEFAULTS), parsed);
         reconcileSlides(merged);
+        reconcileAd(merged);
         return merged;
     } catch (_) {
         return structuredClone(DEFAULTS);
@@ -126,6 +137,36 @@ function reconcileSlides(s) {
     for (const k of DEFAULTS.rotation.slides) {
         if (typeof s.rotation.active[k] !== 'boolean') s.rotation.active[k] = false;
     }
+}
+
+// Migrate the old single-sponsor shape (ad.orgName, ad.tagline, ad.url,
+// ad.logoFile) into the new ad.items[] list. Runs once on load for any
+// persisted state that predates the multi-sponsor refactor.
+function reconcileAd(s) {
+    if (!s.ad) return;
+    if (Array.isArray(s.ad.items)) {
+        s.ad.items = s.ad.items
+            .filter(x => x && typeof x === 'object')
+            .slice(0, 8)
+            .map(normalizeSponsor);
+    } else {
+        s.ad.items = [];
+    }
+    if (s.ad.orgName || s.ad.tagline || s.ad.url || s.ad.logoFile) {
+        s.ad.items.unshift(normalizeSponsor(s.ad));
+    }
+    if (!Number.isFinite(s.ad.dwellMs)) s.ad.dwellMs = 8000;
+    // Clear the legacy fields so they don't keep re-migrating
+    s.ad.orgName = ''; s.ad.tagline = ''; s.ad.url = ''; s.ad.logoFile = '';
+}
+
+function normalizeSponsor(x) {
+    return {
+        orgName: String(x.orgName || '').slice(0, 60),
+        tagline: String(x.tagline || '').slice(0, 80),
+        url:     String(x.url || '').slice(0, 200),
+        logoFile:String(x.logoFile || '').slice(0, 80),
+    };
 }
 
 function persist() {
@@ -282,20 +323,54 @@ function setRotation(patch) {
 
 // ── sponsor ad ────────────────────────────────────────────────────
 
-function setAd(patch) {
-    if (!patch || typeof patch !== 'object') return;
-    const ad = state.ad;
-    if (typeof patch.orgName === 'string')  ad.orgName = patch.orgName.slice(0, 48);
-    if (typeof patch.tagline === 'string')  ad.tagline = patch.tagline.slice(0, 80);
-    if (typeof patch.url === 'string')      ad.url = patch.url.slice(0, 200);
-    if (typeof patch.logoFile === 'string') ad.logoFile = patch.logoFile.slice(0, 120);
+// ── multi-sponsor ad management ───────────────────────────────────
+// Each sponsor is one entry in state.ad.items. The slide renders a
+// panel per item and crossfades between them on a dwell timer.
+
+/** Add a new blank sponsor at the end of the list. */
+function addSponsor(sponsor) {
+    if (state.ad.items.length >= 8) return;
+    state.ad.items.push(normalizeSponsor(sponsor || {}));
     commit();
 }
 
-/** Set just the logo filename (called by the upload endpoint). */
-function setAdLogo(filename) {
-    state.ad.logoFile = String(filename || '').slice(0, 120);
+/** Update one sponsor in place (by index). */
+function updateSponsor(i, patch) {
+    if (!Number.isInteger(i) || i < 0 || i >= state.ad.items.length) return;
+    const cur = state.ad.items[i];
+    if (typeof patch.orgName === 'string')  cur.orgName = patch.orgName.slice(0, 60);
+    if (typeof patch.tagline === 'string')  cur.tagline = patch.tagline.slice(0, 80);
+    if (typeof patch.url === 'string')      cur.url = patch.url.slice(0, 200);
+    if (typeof patch.logoFile === 'string') cur.logoFile = patch.logoFile.slice(0, 80);
     commit();
+}
+
+/** Remove the sponsor at index. */
+function removeSponsor(i) {
+    if (!Number.isInteger(i) || i < 0 || i >= state.ad.items.length) return;
+    state.ad.items.splice(i, 1);
+    commit();
+}
+
+/** Set just the logo for the sponsor at index. Used by the upload endpoint. */
+function setSponsorLogo(i, filename) {
+    if (!Number.isInteger(i) || i < 0 || i >= state.ad.items.length) return;
+    state.ad.items[i].logoFile = String(filename || '').slice(0, 80);
+    commit();
+}
+
+/** Per-sponsor dwell time. */
+function setAdDwell(ms) {
+    if (Number.isFinite(ms)) state.ad.dwellMs = Math.max(2000, Math.min(60000, ms));
+    commit();
+}
+
+/** Backward-compat shim: legacy setAd() routes a single-sponsor patch
+ *  into items[0]. Existing callsites keep working. */
+function setAd(patch) {
+    if (!patch || typeof patch !== 'object') return;
+    if (!state.ad.items.length) addSponsor({});
+    updateSponsor(0, patch);
 }
 
 /** Replace the stats array (demo callouts for the 'stats' slide). */
@@ -409,7 +484,8 @@ function subscribe(fn) {
 module.exports = {
     get, update, setScore,
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
-    setRotation, setAd, setAdLogo, setStats, votePrediction, clearPredictions,
+    setRotation, setAd, setStats,
+    addSponsor, updateSponsor, removeSponsor, setSponsorLogo, setAdDwell, votePrediction, clearPredictions,
     setStandings, setStandingsLoading,
     setTrivia, addTrivia, removeTriviaAt,
     addMosaicFile, removeMosaicFile, setMosaicDwell,

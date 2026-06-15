@@ -221,7 +221,7 @@ try { fs.mkdirSync(BREAK_MOSAIC_DIR, { recursive: true }); } catch (_) { /* exis
 
 app.post('/api/break-ad/upload', (req, res) => {
     try {
-        const { image } = (req.body || {});
+        const { image, sponsorIndex } = (req.body || {});
         if (typeof image !== 'string' || !image.startsWith('data:image/')) {
             return res.status(400).json({ ok: false, error: 'Expected a data:image/* URL' });
         }
@@ -229,23 +229,25 @@ app.post('/api/break-ad/upload', (req, res) => {
         if (!m) return res.status(400).json({ ok: false, error: 'Unsupported image format' });
         const ext = m[1] === 'jpeg' ? 'jpg' : (m[1] === 'svg+xml' ? 'svg' : m[1]);
         const buf = Buffer.from(m[2], 'base64');
-        // 8 MB hard cap — beamer logos don't need more, and this keeps
-        // a typo'd upload from filling memory.
         if (buf.length > 8 * 1024 * 1024) {
             return res.status(413).json({ ok: false, error: 'Image too large (max 8 MB)' });
         }
-        const filename = 'ad-' + Date.now() + '.' + ext;
+        const idx = Number.isInteger(sponsorIndex) ? sponsorIndex : 0;
+        // Ensure the sponsor exists at the target index (auto-create if needed)
+        while (breakState.get().ad.items.length <= idx) breakState.addSponsor({});
+        const filename = 'sponsor-' + idx + '-' + Date.now() + '.' + ext;
         fs.writeFileSync(path.join(BREAK_ADS_DIR, filename), buf);
-        // Prune older ad-* files so the dir doesn't grow unbounded
+        // Prune old logos for THIS sponsor slot only — keep other sponsors intact
         try {
+            const prefix = 'sponsor-' + idx + '-';
             for (const f of fs.readdirSync(BREAK_ADS_DIR)) {
-                if (f.startsWith('ad-') && f !== filename) {
+                if (f.startsWith(prefix) && f !== filename) {
                     try { fs.unlinkSync(path.join(BREAK_ADS_DIR, f)); } catch (_) {}
                 }
             }
         } catch (_) {}
-        breakState.setAdLogo(filename);
-        res.json({ ok: true, logoFile: filename, url: '/break-ads/' + filename });
+        breakState.setSponsorLogo(idx, filename);
+        res.json({ ok: true, logoFile: filename, url: '/break-ads/' + filename, sponsorIndex: idx });
     } catch (e) {
         console.error('Ad upload failed:', e.message);
         res.status(500).json({ ok: false, error: e.message });
@@ -689,7 +691,17 @@ io.on('connection', async socket => {
         }
     });
     socket.on('breakRotation', patch => breakState.setRotation(patch));
-    socket.on('breakAd',       patch => breakState.setAd(patch));
+    // breakAd routes to addSponsor / updateSponsor / removeSponsor
+    // based on the op field: { op: 'add' } | { op: 'update', i, patch } | { op: 'remove', i }
+    socket.on('breakAd', payload => {
+        if (!payload || typeof payload !== 'object') return;
+        if (payload.op === 'add') breakState.addSponsor(payload.sponsor || {});
+        else if (payload.op === 'update') breakState.updateSponsor(payload.i, payload.patch || {});
+        else if (payload.op === 'remove') breakState.removeSponsor(payload.i);
+        else if (payload.op === 'dwell') breakState.setAdDwell(payload.dwellMs);
+        // Legacy single-sponsor patches still work via setAd → items[0]
+        else breakState.setAd(payload);
+    });
 
     // ── Audience predictions (from /predict.html) ────────────────
     // Public, unauthenticated votes — one tap = one vote. A real poll

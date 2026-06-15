@@ -177,30 +177,98 @@
         }
         .msg-empty { color: var(--ink-3); font-style: italic; }
 
-        /* ── Slide: ad (single sponsor) ── */
-        .ad-wrap { display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 2.4vw, 36px); max-width: 900px; }
+        /* ── Slide: ad (multi-sponsor broadcast bumper) ── */
+        .ad-slide { padding: 0; position: relative; overflow: hidden; }
+        /* Diagonal light sweep across the slide — slow, ambient motion. */
+        .ad-sweep {
+            position: absolute; inset: -20% -20%;
+            background: linear-gradient(115deg,
+                transparent 30%,
+                rgba(124,106,255,0.10) 45%,
+                rgba(255,255,255,0.05) 50%,
+                rgba(124,106,255,0.10) 55%,
+                transparent 70%);
+            transform: translateX(-40%);
+            animation: ad-sweep 9s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            pointer-events: none; z-index: 1;
+        }
+        @keyframes ad-sweep {
+            0%   { transform: translateX(-40%); }
+            100% { transform: translateX(40%); }
+        }
+        /* Subtle radial vignette so the logo has a quiet frame. */
+        .ad-vignette {
+            position: absolute; inset: 0; z-index: 1; pointer-events: none;
+            background: radial-gradient(ellipse 70% 60% at 50% 45%, transparent 30%, rgba(7,7,12,0.45) 100%);
+        }
+        .ad-stage { position: absolute; inset: 0; z-index: 2; }
+        .ad-panel {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 14px; padding: 60px;
+            opacity: 0;
+            transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .ad-panel.active { opacity: 1; }
+        .ad-panel.active .ad-eyebrow,
+        .ad-panel.active .ad-name,
+        .ad-panel.active .ad-tag,
+        .ad-panel.active .ad-logo-box { animation: ad-rise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+        .ad-panel.active .ad-eyebrow { animation-delay: 0.05s; }
+        .ad-panel.active .ad-logo-box { animation-delay: 0.15s; }
+        .ad-panel.active .ad-name    { animation-delay: 0.25s; }
+        .ad-panel.active .ad-tag     { animation-delay: 0.35s; }
+        @keyframes ad-rise {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: none; }
+        }
+        .ad-eyebrow {
+            font-size: 13px; font-weight: 700;
+            letter-spacing: 0.45em; text-transform: uppercase; color: var(--ink-3);
+            position: relative; padding-bottom: 10px;
+        }
+        .ad-eyebrow::after {
+            content: ''; position: absolute; left: 50%; bottom: 0;
+            transform: translateX(-50%);
+            width: 36px; height: 1px; background: var(--accent);
+        }
         .ad-logo-box {
-            width: clamp(180px, 22vw, 340px); max-height: clamp(180px, 22vw, 340px);
+            height: clamp(140px, 22vh, 240px);
             display: flex; align-items: center; justify-content: center;
         }
-        .ad-logo-box img { max-width: 100%; max-height: clamp(180px, 22vw, 340px); object-fit: contain; }
+        .ad-logo-box img {
+            max-height: 100%; max-width: 56vw; object-fit: contain;
+            filter: drop-shadow(0 0 28px rgba(255,255,255,0.10));
+            animation: ad-breathe 4.5s ease-in-out infinite;
+        }
+        @keyframes ad-breathe {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.025); }
+        }
         .ad-name {
             font-family: var(--font-display);
-            font-size: clamp(36px, 4.5vw, 72px); font-weight: 700;
-            letter-spacing: 0.02em; color: var(--ink-0); text-transform: uppercase;
-            line-height: 1;
+            font-size: clamp(34px, 4.2vw, 64px); font-weight: 700;
+            color: var(--ink-0); text-align: center; line-height: 1.05;
+            letter-spacing: 0.005em;
         }
         .ad-tag {
-            font-size: clamp(18px, 2vw, 30px); font-weight: 400; font-style: italic;
-            color: var(--ink-1); max-width: 32ch; line-height: 1.3;
+            font-size: clamp(15px, 1.3vw, 20px); font-weight: 400;
+            color: var(--ink-1); text-align: center;
+            max-width: 38ch; line-height: 1.4; font-style: italic;
         }
-        .ad-qr-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
-        .ad-qr-row canvas {
-            border-radius: 12px; background: #fff; padding: 8px;
-            width: clamp(90px, 9vw, 130px) !important; height: clamp(90px, 9vw, 130px) !important;
+        .ad-counter {
+            position: absolute; bottom: 32px; left: 50%;
+            transform: translateX(-50%); z-index: 3;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.35em;
+            color: var(--ink-3); text-transform: uppercase;
+            font-variant-numeric: tabular-nums;
         }
-        .ad-qr-cap { font-size: clamp(13px, 1.1vw, 17px); font-weight: 600; color: var(--ink-2); text-align: left; line-height: 1.4; }
-        .ad-qr-cap strong { color: var(--ink-0); font-weight: 700; display: block; }
+        .ad-qr {
+            position: absolute !important; bottom: 28px; right: 28px; z-index: 3;
+            width: 90px !important; height: 90px !important;
+            border-radius: 10px; background: #fff; padding: 6px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
 
         /* ── Slide: brand (attract) ── */
         .brand-hero { display: flex; flex-direction: column; align-items: center; gap: 28px; }
@@ -691,17 +759,13 @@
                 <div class="msg-hero" id="msgHero">—</div>
             </section>
 
-            <!-- 5. Ad (single sponsor) -->
-            <section class="slide" data-slide="ad">
-                <div class="ad-wrap" id="adWrap">
-                    <div class="ad-logo-box" id="adLogoBox" hidden><img id="adLogo" alt=""></div>
-                    <div class="ad-name" id="adName"></div>
-                    <div class="ad-tag" id="adTag"></div>
-                    <div class="ad-qr-row" id="adQrRow" hidden>
-                        <canvas id="adQr"></canvas>
-                        <div class="ad-qr-cap"><strong>Scan mich</strong><span id="adUrl"></span></div>
-                    </div>
-                </div>
+            <!-- 5. Ad (multi-sponsor bumper) -->
+            <section class="slide ad-slide" data-slide="ad">
+                <div class="ad-sweep" id="adSweep"></div>
+                <div class="ad-vignette"></div>
+                <div class="ad-stage" id="adStage"></div>
+                <div class="ad-counter" id="adCounter" hidden></div>
+                <canvas class="ad-qr" id="adQr" hidden></canvas>
             </section>
 
             <!-- 6. Brand (attract) -->
@@ -990,31 +1054,89 @@
             applyRotation(s.rotation || {});
         }
 
+        // ── Ad (multi-sponsor broadcast bumper) ─────────────────────
+        // Renders one panel per sponsor in state.ad.items, crossfading
+        // between them on a per-sponsor dwell timer. The QR is drawn
+        // from the active sponsor's URL (if any) and rebuilt on each
+        // panel change. A 'Präsentiert von' eyebrow + diagonal light
+        // sweep + breathing logo give the premium broadcast feel.
+        let adTimer = null, adIndex = 0, adPanels = [], adCurrentUrl = '';
         function renderAd(ad) {
-            const hasName = !!(ad && ad.orgName);
-            $('#adName').textContent = (ad && ad.orgName) || '';
-            $('#adTag').textContent = (ad && ad.tagline) || '';
-            const logoBox = $('#adLogoBox');
-            if (ad && ad.logoFile) {
-                $('#adLogo').src = '/break-ads/' + ad.logoFile + '?t=' + Date.now();
-                logoBox.hidden = false;
-            } else { logoBox.hidden = true; }
-            const url = (ad && ad.url) || '';
-            const qrRow = $('#adQrRow');
+            ad = ad || {};
+            const stage = $('#adStage');
+            const items = Array.isArray(ad.items) ? ad.items : [];
+            // Placeholder when no sponsors configured
+            if (items.length === 0) {
+                if (adTimer) { clearInterval(adTimer); adTimer = null; }
+                adPanels = [];
+                adIndex = 0;
+                stage.innerHTML =
+                    '<div class="ad-panel active"><div class="ad-eyebrow">Präsentiert von</div>' +
+                    '<div class="ad-logo-box" style="font-family:var(--font-display);font-size:clamp(40px,5vw,72px);font-weight:700;color:var(--ink-3)">Dein Sponsor</div>' +
+                    '<div class="ad-name" style="color:var(--ink-3)">Logo hier</div>' +
+                    '<div class="ad-tag">In der App unter „Sponsor“ hinzufügen</div></div>';
+                const qr = $('#adQr'); if (qr) qr.hidden = true;
+                const cnt = $('#adCounter'); if (cnt) cnt.hidden = true;
+                return;
+            }
+            // (Re)build panels only when the item count or filenames change
+            const sig = items.map(x => (x.logoFile || '') + '|' + (x.orgName || '')).join('§');
+            if (stage.dataset.sig !== sig) {
+                stage.innerHTML = items.map((s, i) =>
+                    '<div class="ad-panel' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '">' +
+                    '<div class="ad-eyebrow">Präsentiert von</div>' +
+                    '<div class="ad-logo-box">' + (s.logoFile ? '<img src="/break-ads/' + s.logoFile + '?t=' + Date.now() + '" alt="" onerror="this.parentElement.innerHTML=\'<div style=\\\'font-family:var(--font-display);font-size:clamp(36px,4vw,56px);font-weight:700;color:var(--ink-3)\\\'>' + escapeHtml(s.orgName || '').replace(/'/g, '') + '</div>\'">' : '<div style="font-family:var(--font-display);font-size:clamp(36px,4vw,56px);font-weight:700;color:var(--ink-3)">' + escapeHtml(s.orgName || '') + '</div>') + '</div>' +
+                    '<div class="ad-name">' + escapeHtml(s.orgName || '') + '</div>' +
+                    '<div class="ad-tag">' + escapeHtml(s.tagline || '') + '</div>' +
+                    '</div>'
+                ).join('');
+                stage.dataset.sig = sig;
+                adPanels = Array.from(stage.querySelectorAll('.ad-panel'));
+                adIndex = 0;
+            }
+            // Counter (only when more than one sponsor)
+            const cnt = $('#adCounter');
+            if (cnt) {
+                if (items.length > 1) { cnt.hidden = false; cnt.textContent = (adIndex + 1) + ' / ' + items.length; }
+                else cnt.hidden = true;
+            }
+            // QR from active sponsor
+            const active = items[adIndex];
+            const url = (active && active.url) || '';
+            const qr = $('#adQr');
             if (url && window.QRCode) {
-                $('#adUrl').textContent = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-                QRCode.toCanvas($('#adQr'), url, { width: 120, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
-                qrRow.hidden = false;
-            } else if (hasName) {
-                qrRow.hidden = true;
+                if (url !== adCurrentUrl) {
+                    adCurrentUrl = url;
+                    QRCode.toCanvas(qr, url, { width: 90, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
+                }
+                qr.hidden = false;
             } else {
-                // No ad configured at all — show a placeholder so the slide
-                // isn't blank if it ends up in the rotation.
-                $('#adName').textContent = 'Dein Logo hier';
-                $('#adTag').textContent = 'Sponsor-Platz — in der App konfigurieren';
-                qrRow.hidden = true;
+                qr.hidden = true;
             }
         }
+        function startAdCycle(dwell) {
+            if (adTimer) { clearInterval(adTimer); adTimer = null; }
+            if (adPanels.length <= 1) return;
+            adTimer = setInterval(() => {
+                if (adPanels.length === 0) return;
+                adPanels[adIndex].classList.remove('active');
+                adIndex = (adIndex + 1) % adPanels.length;
+                adPanels[adIndex].classList.add('active');
+                const cnt = $('#adCounter'); if (cnt) cnt.textContent = (adIndex + 1) + ' / ' + adPanels.length;
+                // Refresh QR for the new panel
+                const items = (window.__lastState && window.__lastState.ad && window.__lastState.ad.items) || [];
+                const active = items[adIndex] || {};
+                const url = active.url || '';
+                const qr = $('#adQr');
+                if (url && window.QRCode && url !== adCurrentUrl) {
+                    adCurrentUrl = url;
+                    QRCode.toCanvas(qr, url, { width: 90, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
+                } else if (!url) {
+                    qr.hidden = true;
+                }
+            }, dwell || 8000);
+        }
+        function stopAdCycle() { if (adTimer) { clearInterval(adTimer); adTimer = null; } }
 
         // ── Rotation engine ──
         let rotTimer = null;
@@ -1080,6 +1202,8 @@
             if (name === 'stats') animateStats();
             if (name === 'trivia') startTrivia(); else stopTrivia();
             if (name === 'mosaic') startMosaic(); else stopMosaic();
+            if (name === 'ad') startAdCycle((window.__lastState && window.__lastState.ad && window.__lastState.ad.dwellMs) || 8000);
+            else stopAdCycle();
             buildEqualizer();   // idempotent — builds bars once
             if (name === 'predictions') buildPredQr();
         }
