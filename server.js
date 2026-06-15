@@ -5,6 +5,7 @@ const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
 const config = require('./config');
+const breakState = require('./break-state');
 
 // .env is the single source of truth. Loaded once at boot with
 // override:true so a hand-edited (or in-app-edited) file always wins
@@ -234,6 +235,11 @@ function lanUrls() {
 }
 
 app.use(express.static('public'));
+
+// ── Break-screen state → broadcast to every client on change ────
+// break.html (beamer) and break-control.html (operator) are both views
+// over the same state. One subscription fans updates to all sockets.
+breakState.subscribe(state => io.emit('breakState', state));
 
 io.on('connection', async socket => {
     console.log('Client connected');
@@ -514,6 +520,22 @@ io.on('connection', async socket => {
             console.error('Automated action (PauseAction) failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
             io.emit('actionFailed');
+        }
+    });
+
+    // ── Break screen (audience + operator controls) ────────────
+    // Send full state on connect so a refresh / new device is immediately correct.
+    socket.emit('breakState', breakState.get());
+
+    socket.on('breakUpdate',  partial => breakState.update(partial));
+    socket.on('breakScore',   d => breakState.setScore(d.side, d.delta));
+    socket.on('breakTimer',   d => {
+        switch (d.action) {
+            case 'start':   breakState.startTimer(); break;
+            case 'pause':   breakState.pauseTimer(); break;
+            case 'reset':   breakState.resetTimer(d.sec); break;
+            case 'adjust':  breakState.adjustTimer(d.deltaSec); break;
+            case 'duration':breakState.setDuration(d.sec); break;
         }
     });
 

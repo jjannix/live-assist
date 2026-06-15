@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <title>Break · Live Assist</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Operator page: compact editor for break.html. Sits on top of style.css
+           and reuses .section / .kv / .chip / .back-btn / .topbar. */
+        body { overflow-y: auto; }
+        .main { padding-bottom: 40px; }
+
+        .b-hero {
+            text-align: center; padding: 12px 20px 4px;
+        }
+        .b-clock {
+            font-size: 56px; font-weight: 800; letter-spacing: -1px;
+            font-variant-numeric: tabular-nums; color: var(--text);
+            line-height: 1; margin: 4px 0;
+        }
+        .b-clock.done { color: var(--amber); }
+        .b-clock-cap { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-3); }
+
+        .b-timer-btns { display: grid; grid-template-columns: 2fr 2fr 1.5fr; gap: 8px; padding: 0 20px 8px; }
+        .b-timer-btns .chip { padding: 16px 0; font-size: 14px; }
+        .b-adj { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; padding: 0 20px; }
+        .b-adj .chip { padding: 12px 0; font-size: 13px; }
+
+        /* Score steppers */
+        .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px; }
+        .score-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .score-card input {
+            width: 100%; text-align: center;
+            background: transparent; border: none; outline: none;
+            color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
+            border-bottom: 1px solid var(--border); padding: 4px 0;
+        }
+        .score-card input:focus { border-bottom-color: var(--border-hl); }
+        .score-val { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); line-height: 1; }
+        .score-steppers { display: flex; gap: 8px; width: 100%; }
+        .score-steppers .chip { flex: 1; padding: 12px 0; font-size: 18px; font-weight: 700; }
+
+        .field { padding: 11px 0; border-bottom: 1px solid var(--border); }
+        .field:last-child { border-bottom: none; }
+        .field input {
+            width: 100%; background: var(--card-up); border: 1px solid var(--border); border-radius: 12px;
+            padding: 12px 14px; color: var(--text); font-family: inherit; font-size: 14px;
+        }
+        .field input:focus { outline: none; border-color: var(--border-hl); }
+        .field-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <button class="back-btn" onclick="location.href='/'" aria-label="Back to controller">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="logo">BREAK</span>
+        <div class="status-pill">
+            <span class="conn-dot" id="conn" data-s="wait"></span>
+            <span class="status-txt" id="connTxt">connecting</span>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- Live clock mirror -->
+        <div class="b-hero">
+            <div class="b-clock" id="liveClock">15:00</div>
+            <div class="b-clock-cap" id="liveCap">bis Anpfiff</div>
+        </div>
+        <div class="b-timer-btns">
+            <button class="chip" id="tStart">▶ Start</button>
+            <button class="chip" id="tPause">❚❚ Pause</button>
+            <button class="chip" id="tReset">Reset</button>
+        </div>
+        <div class="b-adj">
+            <button class="chip" data-adj="-60">−1m</button>
+            <button class="chip" data-adj="-10">−10s</button>
+            <button class="chip" data-adj="10">+10s</button>
+            <button class="chip" data-adj="60">+1m</button>
+        </div>
+
+        <div class="section" style="margin-top:16px">
+            <div class="section-title">Score</div>
+            <div class="score-grid">
+                <div class="score-card">
+                    <input id="homeName" type="text" placeholder="Home" maxlength="24">
+                    <div class="score-val" id="homeScore">0</div>
+                    <div class="score-steppers">
+                        <button class="chip" data-side="home" data-delta="-1">−</button>
+                        <button class="chip" data-side="home" data-delta="1">+</button>
+                    </div>
+                </div>
+                <div class="score-card">
+                    <input id="awayName" type="text" placeholder="Away" maxlength="24">
+                    <div class="score-val" id="awayScore">0</div>
+                    <div class="score-steppers">
+                        <button class="chip" data-side="away" data-delta="-1">−</button>
+                        <button class="chip" data-side="away" data-delta="1">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Match clock</div>
+            <div class="field">
+                <div class="field-lbl">Label (HT / FT / …)</div>
+                <input id="matchLbl" type="text" maxlength="8" placeholder="HT">
+            </div>
+            <div class="field">
+                <div class="field-lbl">Frozen time (e.g. 45:00)</div>
+                <input id="matchVal" type="text" maxlength="12" placeholder="45:00">
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Halftime length (minutes)</div>
+            <div class="b-adj" style="padding:0;">
+                <button class="chip" data-dur="10">10</button>
+                <button class="chip" data-dur="15">15</button>
+                <button class="chip" data-dur="20">20</button>
+                <button class="chip" data-dur="25">25</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Display</div>
+            <div class="field">
+                <div class="field-lbl">Title</div>
+                <input id="title" type="text" maxlength="40" placeholder="HALBZEIT">
+            </div>
+            <div class="field">
+                <div class="field-lbl">Message (optional)</div>
+                <input id="message" type="text" maxlength="120" placeholder="Schau gleich weiter...">
+            </div>
+        </div>
+
+    </main>
+
+    <div class="toast-box" id="toastBox"></div>
+
+    <script>
+    (() => {
+        'use strict';
+        const $ = s => document.querySelector(s);
+        const socket = io();
+
+        let state = {};
+        let typingTimer = null;
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function fmt(sec) {
+            sec = Math.max(0, Math.floor(sec));
+            const m = Math.floor(sec / 60), s = sec % 60;
+            return pad(m) + ':' + pad(s);
+        }
+
+        // Local tick so the on-screen clock counts down smoothly between
+        // server broadcasts (server is still the authority — see break-state.js).
+        let endsAt = null, running = false, remaining = 0;
+        setInterval(() => {
+            if (!running || !endsAt) return;
+            const rem = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            const el = $('#liveClock');
+            el.textContent = fmt(rem);
+            el.classList.toggle('done', rem <= 0);
+            $('#liveCap').textContent = rem <= 0 ? 'Anpfiff' : 'bis Anpfiff';
+        }, 250);
+
+        function render(s) {
+            state = s;
+            const t = s.timer || {};
+            running = !!t.running;
+            endsAt = t.endsAt;
+            remaining = t.remainingSec || 0;
+            const el = $('#liveClock');
+            el.textContent = fmt(running && endsAt ? Math.max(0, Math.round((endsAt - Date.now())/1000)) : remaining);
+            el.classList.toggle('done', remaining <= 0 && !running);
+            $('#liveCap').textContent = running ? 'bis Anpfiff' : (remaining <= 0 ? 'Anpfiff' : 'pausiert');
+
+            // Sync fields — but never clobber what the operator is actively typing.
+            syncUnlessFocused('#homeName', (s.home || {}).name || '');
+            syncUnlessFocused('#awayName', (s.away || {}).name || '');
+            $('#homeScore').textContent = (s.home || {}).score || 0;
+            $('#awayScore').textContent = (s.away || {}).score || 0;
+            syncUnlessFocused('#matchLbl', (s.matchClock || {}).label || '');
+            syncUnlessFocused('#matchVal', (s.matchClock || {}).display || '');
+            syncUnlessFocused('#title', s.title || '');
+            syncUnlessFocused('#message', s.message || '');
+        }
+        function syncUnlessFocused(sel, val) {
+            const el = $(sel); if (document.activeElement !== el) el.value = val;
+        }
+
+        socket.on('connect',      () => { $('#conn').dataset.s = 'ok';  $('#connTxt').textContent = 'live'; });
+        socket.on('disconnect',   () => { $('#conn').dataset.s = 'off'; $('#connTxt').textContent = 'offline'; });
+        socket.on('connect_error',() => { $('#conn').dataset.s = 'wait'; $('#connTxt').textContent = 'reconnecting'; });
+        socket.on('breakState', render);
+        socket.emit('breakStateGet');
+
+        // ── Emit helpers ──
+        const patch = partial => socket.emit('breakUpdate', partial);
+
+        // Timer buttons
+        $('#tStart').onclick  = () => socket.emit('breakTimer', { action: 'start' });
+        $('#tPause').onclick  = () => socket.emit('breakTimer', { action: 'pause' });
+        $('#tReset').onclick  = () => { socket.emit('breakTimer', { action: 'reset' }); toast('Timer reset', 'info', 1000); };
+        document.querySelectorAll('[data-adj]').forEach(b => b.onclick = () => socket.emit('breakTimer', { action: 'adjust', deltaSec: parseInt(b.dataset.adj, 10) }));
+        document.querySelectorAll('[data-dur]').forEach(b => b.onclick = () => { socket.emit('breakTimer', { action: 'duration', sec: parseInt(b.dataset.dur, 10) * 60 }); toast('Halftime: ' + b.dataset.dur + ' min', 'info', 1000); });
+
+        // Score steppers
+        document.querySelectorAll('[data-side]').forEach(b => b.onclick = () => socket.emit('breakScore', { side: b.dataset.side, delta: parseInt(b.dataset.delta, 10) }));
+
+        // Free-text fields — debounce so we don't spam the socket per keystroke
+        function debounce(sel, build) {
+            const el = $(sel);
+            el.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => patch(build(el.value)), 350);
+            });
+        }
+        debounce('#homeName', v => ({ home: { name: v } }));
+        debounce('#awayName', v => ({ away: { name: v } }));
+        debounce('#matchLbl', v => ({ matchClock: { label: v } }));
+        debounce('#matchVal', v => ({ matchClock: { display: v } }));
+        debounce('#title',    v => ({ title: v }));
+        debounce('#message',  v => ({ message: v }));
+
+        // Toast (reused from controller)
+        function toast(msg, type = 'info', dur = 2000) {
+            const c = $('#toastBox');
+            while (c.children.length >= 2) c.removeChild(c.firstChild);
+            const t = document.createElement('div');
+            t.className = `toast t-${type}`; t.textContent = msg;
+            c.appendChild(t);
+            requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, dur);
+        }
+    })();
+    </script>
+</body>
+</html>
