@@ -2,3 +2,4 @@ node_modules
 .env
 break-state.json
 public/break-ads/
+public/break-mosaic/

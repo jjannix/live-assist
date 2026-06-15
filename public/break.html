@@ -551,6 +551,70 @@
         .pred-qr-cap { font-size: clamp(12px, 1vw, 15px); font-weight: 600; color: var(--ink-2); }
         .pred-qr-cap strong { display: block; color: var(--ink-0); font-weight: 700; }
 
+        /* ═══════ Slide: standings (Bundesliga live table) ═══════ */
+        .std-head { width: min(1100px, 92vw); display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+        .std-eyebrow { font-family: var(--font-display); font-size: clamp(20px, 2.4vw, 34px); font-weight: 700; color: var(--ink-0); }
+        .std-meta { font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; }
+        .std-table { width: min(1100px, 92vw); border-collapse: collapse; font-variant-numeric: tabular-nums; }
+        .std-table thead th {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+            color: var(--ink-3); padding: 8px 12px; text-align: center;
+            border-bottom: 1px solid var(--line);
+        }
+        .std-table thead th.team-col { text-align: left; }
+        .std-table tbody tr {
+            border-bottom: 1px solid var(--line);
+            transition: background 0.2s;
+        }
+        .std-table tbody tr.zone-cl   { background: linear-gradient(90deg, rgba(0,180,120,0.10), transparent 80%); }
+        .std-table tbody tr.zone-el   { background: linear-gradient(90deg, rgba(0,180,120,0.06), transparent 80%); }
+        .std-table tbody tr.zone-rel  { background: linear-gradient(90deg, rgba(255,80,80,0.10), transparent 80%); }
+        .std-table tbody tr.zone-play { background: linear-gradient(90deg, rgba(255,160,40,0.08), transparent 80%); }
+        .std-table tbody td { padding: 10px 12px; text-align: center; font-size: clamp(13px, 1.15vw, 17px); color: var(--ink-1); }
+        .std-table tbody td.rank { color: var(--ink-2); font-weight: 600; width: 4ch; }
+        .std-table tbody td.team { text-align: left; font-weight: 700; color: var(--ink-0); }
+        .std-team { display: flex; align-items: center; gap: 10px; }
+        .std-team img { width: 24px; height: 24px; object-fit: contain; filter: drop-shadow(0 0 4px rgba(255,255,255,0.06)); }
+        .std-team .abbr { color: var(--ink-3); font-weight: 600; font-size: 0.85em; margin-left: 4px; }
+        .std-table tbody td.pts { color: var(--accent); font-weight: 800; }
+        .std-empty { font-size: 18px; color: var(--ink-3); font-style: italic; padding: 40px; }
+
+        /* ═══════ Slide: trivia ═══════ */
+        .trivia-slide { text-align: center; }
+        .trivia-eyebrow {
+            font-size: clamp(14px, 1.3vw, 20px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--accent);
+            margin-bottom: clamp(20px, 3vw, 40px);
+        }
+        .trivia-text {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 3.6vw, 56px); font-weight: 500;
+            line-height: 1.25; color: var(--ink-0);
+            max-width: 26ch; margin: 0 auto;
+            animation: trivia-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes trivia-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+        /* ═══════ Slide: mosaic (ken-burns photo gallery) ═══════ */
+        .mosaic-slide { padding: 0; position: relative; overflow: hidden; }
+        .mosaic-stage { position: absolute; inset: 0; }
+        .mosaic-img {
+            position: absolute; inset: 0;
+            background-size: cover; background-position: center;
+            opacity: 0; transition: opacity 1.2s ease-in-out;
+            animation: kb 9s ease-in-out infinite alternate;
+        }
+        .mosaic-img.active { opacity: 1; }
+        @keyframes kb {
+            0%   { transform: scale(1.0)  translate(0, 0); }
+            100% { transform: scale(1.12) translate(-2%, -1.5%); }
+        }
+        .mosaic-cap {
+            position: absolute; left: 40px; bottom: 40px; z-index: 2;
+            font-size: 14px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase;
+            color: var(--ink-0); text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+        }
+
         /* Slide indicator (tiny dots, bottom-right) — shows which slide
            is live and how many are in the rotation. Subtle broadcast cue. */
         .indicators {
@@ -757,6 +821,32 @@
                     <div class="pred-qr-cap"><strong>Scannen &amp; mittippen</strong><span id="predTotal">0 Tipps</span></div>
                 </div>
             </section>
+
+            <!-- 18. Standings (live Bundesliga table) -->
+            <section class="slide" data-slide="standings">
+                <div class="std-head">
+                    <div class="std-eyebrow" id="stdDivName">Bundesliga</div>
+                    <div class="std-meta" id="stdMeta">Aktualisiert &mdash;</div>
+                </div>
+                <table class="std-table" id="stdTable">
+                    <thead>
+                        <tr><th>#</th><th class="team-col">Team</th><th>SP</th><th>S</th><th>U</th><th>N</th><th>Diff</th><th>Pkt</th></tr>
+                    </thead>
+                    <tbody id="stdBody"></tbody>
+                </table>
+            </section>
+
+            <!-- 19. Trivia (one rotating fact per dwell) -->
+            <section class="slide trivia-slide" data-slide="trivia">
+                <div class="trivia-eyebrow">Wusstest du&hellip;</div>
+                <div class="trivia-text" id="triviaText">Lädt…</div>
+            </section>
+
+            <!-- 20. Mosaic (operator photo gallery, ken-burns) -->
+            <section class="slide mosaic-slide" data-slide="mosaic">
+                <div class="mosaic-stage" id="mosaicStage"></div>
+                <div class="mosaic-cap" id="mosaicCap" hidden></div>
+            </section>
         </div>
 
         <!-- Persistent lower-third -->
@@ -863,7 +953,13 @@
             // Stats + predictions + ticker (cheap to rebuild each render)
             renderStats(s.stats || []);
             renderPredictions(s.predictions || {});
+            renderStandings(s.standings || {});
             renderTicker(s);
+
+            // Stash for slide-lifecycle code (trivia/mosaic start when shown)
+            window.__lastState = s;
+            // If trivia is currently visible, refresh the text/dwell
+            if (window.__activeSlide === 'trivia') startTrivia();
 
             // Clocks
             const t = s.timer || {};
@@ -974,6 +1070,7 @@
         }
 
         function showSlide(name) {
+            window.__activeSlide = name;
             $$('.slide').forEach(el => el.classList.toggle('active', el.dataset.slide === name));
             // Lifecycle: start/stop canvas systems so they only burn CPU
             // while visible, and kick the count-up / flow restarts.
@@ -981,6 +1078,8 @@
             if (name === 'audiolizer') startAudio(); else stopAudio();
             if (name === 'flowfield') startFlow(); else stopFlow();
             if (name === 'stats') animateStats();
+            if (name === 'trivia') startTrivia(); else stopTrivia();
+            if (name === 'mosaic') startMosaic(); else stopMosaic();
             buildEqualizer();   // idempotent — builds bars once
             if (name === 'predictions') buildPredQr();
         }
@@ -1316,6 +1415,105 @@
             const qr = $('#predQr');
             if (!qr || qr.width > 0) return;  // already drawn
             if (window.QRCode) QRCode.toCanvas(qr, window.location.origin + '/predict.html', { width: 110, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
+        }
+
+        // ── Standings (Bundesliga live table) ────────────────────────
+        const DIV_NAMES = { bl1: 'Bundesliga', bl2: '2. Bundesliga', bl3: '3. Liga' };
+        function renderStandings(sg) {
+            sg = sg || {};
+            const nameEl = $('#stdDivName'); if (nameEl) nameEl.textContent = DIV_NAMES[sg.division] || 'Liga';
+            const metaEl = $('#stdMeta');
+            if (metaEl) {
+                if (sg.loading && (!sg.rows || sg.rows.length === 0)) {
+                    metaEl.textContent = 'Aktualisiere…';
+                } else if (sg.updatedAt) {
+                    const d = new Date(sg.updatedAt);
+                    metaEl.textContent = 'Stand ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                } else {
+                    metaEl.textContent = 'Keine Daten';
+                }
+            }
+            const body = $('#stdBody');
+            if (!body) return;
+            const rows = sg.rows || [];
+            if (rows.length === 0) {
+                body.innerHTML = '<tr><td colspan="8" class="std-empty">' + (sg.loading ? 'Tabelle wird geladen…' : 'Noch keine Daten — API nicht erreichbar?') + '</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(r => {
+                const diff = r.diff > 0 ? '+' + r.diff : String(r.diff);
+                const diffClass = r.diff > 0 ? 'pos' : (r.diff < 0 ? 'neg' : '');
+                const zone = r.rank <= 4 ? 'zone-cl' : (r.rank <= 6 ? 'zone-el' : (r.rank >= rows.length - 1 ? 'zone-rel' : (r.rank >= rows.length - 2 ? 'zone-play' : '')));
+                const icon = r.icon ? '<img src="' + r.icon + '" alt="" onerror="this.style.display=\'none\'">' : '';
+                return '<tr class="' + zone + '">' +
+                    '<td class="rank">' + r.rank + '</td>' +
+                    '<td class="team"><div class="std-team">' + icon + '<span>' + escapeHtml(r.name) + '</span></div></td>' +
+                    '<td>' + r.matches + '</td>' +
+                    '<td>' + r.w + '</td>' +
+                    '<td>' + r.d + '</td>' +
+                    '<td>' + r.l + '</td>' +
+                    '<td class="' + diffClass + '">' + diff + '</td>' +
+                    '<td class="pts">' + r.points + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        // ── Trivia (one rotating fact per dwell) ─────────────────────
+        let triviaTimer = null, triviaIndex = 0;
+        function startTrivia() {
+            const t = (s && s.trivia) || window.__lastState && window.__lastState.trivia || { items: [], dwellMs: 8000 };
+            // Use latest state if we have it
+            const items = (window.__lastState && window.__lastState.trivia && window.__lastState.trivia.items) || t.items || [];
+            if (!items.length) { $('#triviaText').textContent = 'Noch keine Fakten hinterlegt.'; return; }
+            const dwell = ((window.__lastState && window.__lastState.trivia && window.__lastState.trivia.dwellMs) || t.dwellMs || 8000);
+            stopTrivia();
+            const show = () => {
+                const item = items[triviaIndex % items.length];
+                const el = $('#triviaText');
+                el.textContent = item;
+                el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+                triviaIndex++;
+            };
+            show();
+            triviaTimer = setInterval(show, dwell);
+        }
+        function stopTrivia() { if (triviaTimer) { clearInterval(triviaTimer); triviaTimer = null; } }
+
+        // ── Mosaic (ken-burns photo gallery) ─────────────────────────
+        let mosaicTimer = null, mosaicIndex = 0, mosaicEls = [];
+        function startMosaic() {
+            const state = window.__lastState || {};
+            const files = (state.mosaic && state.mosaic.files) || [];
+            const stage = $('#mosaicStage');
+            if (!stage) return;
+            stopMosaic();
+            if (files.length === 0) {
+                stage.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:18px;font-style:italic">Noch keine Fotos hochgeladen</div>';
+                return;
+            }
+            // Pre-create all img elements
+            stage.innerHTML = '';
+            mosaicEls = files.map((f, i) => {
+                const d = document.createElement('div');
+                d.className = 'mosaic-img';
+                d.style.backgroundImage = 'url(/break-mosaic/' + encodeURIComponent(f) + ')';
+                if (i === 0) d.classList.add('active');
+                // Stagger the ken-burns animation per-image
+                d.style.animationDelay = (i * 0.7) + 's';
+                stage.appendChild(d);
+                return d;
+            });
+            if (mosaicEls.length > 1) {
+                const dwell = state.mosaic.dwellMs || 7000;
+                mosaicTimer = setInterval(() => {
+                    mosaicEls[mosaicIndex].classList.remove('active');
+                    mosaicIndex = (mosaicIndex + 1) % mosaicEls.length;
+                    mosaicEls[mosaicIndex].classList.add('active');
+                }, dwell);
+            }
+        }
+        function stopMosaic() {
+            if (mosaicTimer) { clearInterval(mosaicTimer); mosaicTimer = null; }
         }
 
         socket.on('breakState', render);

@@ -42,8 +42,8 @@ const DEFAULTS = Object.freeze({
     // Demo slides (particles/equalizer/stats/ticker) ship OFF so they
     // don't appear unless the operator opts in.
     rotation: {
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss', 'audiolizer', 'flowfield', 'predictions'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false, audiolizer: false, flowfield: false, predictions: false },
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker', 'splitflap', 'neon', 'wave', 'swiss', 'audiolizer', 'flowfield', 'predictions', 'standings', 'trivia', 'mosaic'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false, splitflap: false, neon: false, wave: false, swiss: false, audiolizer: false, flowfield: false, predictions: false, standings: false, trivia: false, mosaic: false },
         dwellMs: 12000,
         pinned: null,
     },
@@ -66,6 +66,32 @@ const DEFAULTS = Object.freeze({
         question: 'Wie steht es am Ende?',
         tally: {},          // { "2:1": 3, "1:1": 5, ... }
         total: 0,
+    },
+
+    // Bundesliga live table (OpenLigaDB, free + no key). Server
+    // refreshes every 5 min; the slide is read-only.
+    standings: {
+        division: 'bl1',    // 'bl1' | 'bl2' | 'bl3'
+        season: 2025,
+        rows: [],           // [{ rank, name, short, icon, points, goals, against, diff, matches, w, d, l }]
+        updatedAt: 0,
+        loading: false,
+    },
+
+    // Operator-curated trivia. One item per dwell, big display type.
+    trivia: {
+        items: [
+            'Wusstest du: Lewandowski erzielte 2020/21 einen Fünferpack in 9 Minuten — Bundesliga-Rekord.',
+            'Wusstest du: Der FC Bayern ist mit 32 Titeln deutscher Rekordmeister.',
+            'Wusstest du: 1963 wurde die Bundesliga als eingleisige Profiliga gegründet — 16 Vereine spielten die erste Saison.',
+        ],
+        dwellMs: 8000,
+    },
+
+    // Operator-uploaded photos, ken-burns slow zoom, cycle per dwell.
+    mosaic: {
+        files: [],          // filenames in public/break-mosaic/
+        dwellMs: 7000,
     },
 });
 
@@ -165,6 +191,21 @@ function update(partial) {
         if (typeof partial.matchClock.label === 'string')   state.matchClock.label = partial.matchClock.label.slice(0, 8);
         if (typeof partial.matchClock.display === 'string') state.matchClock.display = partial.matchClock.display.slice(0, 12);
     }
+    if (partial.predictions) {
+        if (typeof partial.predictions.question === 'string') state.predictions.question = partial.predictions.question.slice(0, 80);
+    }
+    if (partial.standings) {
+        if (typeof partial.standings.division === 'string' && /^(bl1|bl2|bl3)$/.test(partial.standings.division)) {
+            if (state.standings.division !== partial.standings.division) {
+                state.standings.division = partial.standings.division;
+                // Schedule a server-side refresh if a refresh fn is wired
+                if (typeof onStandingsDivisionChange === 'function') onStandingsDivisionChange(partial.standings.division);
+            }
+        }
+    }
+    // Op-style mutations (for non-patch operations like trivia add/remove)
+    if (partial.op === 'trivia/add'   && typeof partial.text === 'string') addTrivia(partial.text);
+    if (partial.op === 'trivia/remove' && Number.isInteger(partial.index))  removeTriviaAt(partial.index);
     commit();
 }
 
@@ -287,6 +328,76 @@ function clearPredictions() {
     commit();
 }
 
+// ── standings (Bundesliga live) ───────────────────────────────────
+
+/** Replace the standings table wholesale. Called by the server after
+ *  fetching from OpenLigaDB. */
+function setStandings(patch) {
+    patch = patch || {};
+    if (typeof patch.division === 'string' && /^(bl1|bl2|bl3)$/.test(patch.division)) {
+        state.standings.division = patch.division;
+    }
+    if (Number.isFinite(patch.season)) state.standings.season = patch.season;
+    if (Array.isArray(patch.rows)) state.standings.rows = patch.rows;
+    state.standings.updatedAt = Date.now();
+    state.standings.loading = false;
+    commit();
+}
+
+function setStandingsLoading(v) {
+    state.standings.loading = !!v;
+    commit();
+}
+
+// ── trivia (operator-curated) ─────────────────────────────────────
+
+function setTrivia(patch) {
+    patch = patch || {};
+    if (Array.isArray(patch.items)) {
+        state.trivia.items = patch.items
+            .filter(t => typeof t === 'string' && t.trim())
+            .slice(0, 30)
+            .map(t => t.trim().slice(0, 240));
+    }
+    if (Number.isFinite(patch.dwellMs)) state.trivia.dwellMs = Math.max(2000, Math.min(60000, patch.dwellMs));
+    commit();
+}
+
+function addTrivia(text) {
+    const t = String(text || '').trim().slice(0, 240);
+    if (!t || state.trivia.items.length >= 30) return;
+    state.trivia.items.push(t);
+    commit();
+}
+
+function removeTriviaAt(i) {
+    if (!Number.isInteger(i) || i < 0 || i >= state.trivia.items.length) return;
+    state.trivia.items.splice(i, 1);
+    commit();
+}
+
+// ── mosaic (operator-uploaded photos) ─────────────────────────────
+
+function addMosaicFile(name) {
+    name = String(name || '').trim();
+    if (!name || state.mosaic.files.includes(name)) return;
+    if (state.mosaic.files.length >= 24) return;
+    state.mosaic.files.push(name);
+    commit();
+}
+
+function removeMosaicFile(name) {
+    const i = state.mosaic.files.indexOf(name);
+    if (i < 0) return;
+    state.mosaic.files.splice(i, 1);
+    commit();
+}
+
+function setMosaicDwell(ms) {
+    if (Number.isFinite(ms)) state.mosaic.dwellMs = Math.max(2000, Math.min(60000, ms));
+    commit();
+}
+
 // ── pub/sub ───────────────────────────────────────────────────────
 
 /** Subscribe to state changes. Returns an unsubscribe fn. */
@@ -299,6 +410,9 @@ module.exports = {
     get, update, setScore,
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
     setRotation, setAd, setAdLogo, setStats, votePrediction, clearPredictions,
+    setStandings, setStandingsLoading,
+    setTrivia, addTrivia, removeTriviaAt,
+    addMosaicFile, removeMosaicFile, setMosaicDwell,
     subscribe,
     DEFAULTS,
 };

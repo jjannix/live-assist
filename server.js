@@ -8,6 +8,10 @@ const { default: OBSWebSocket } = require('obs-websocket-js');
 const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
 const config = require('./config');
 const breakState = require('./break-state');
+// When the operator switches division via the socket (not just the
+// REST endpoint), kick a fresh fetch so the slide doesn't show stale
+// data for the new league.
+breakState.onStandingsDivisionChange = div => { refreshStandings(); };
 
 // .env is the single source of truth. Loaded once at boot with
 // override:true so a hand-edited (or in-app-edited) file always wins
@@ -212,6 +216,8 @@ app.get('/api/network', (req, res) => {
 // No multer, no multipart — matches the project's no-extra-deps ethos.
 const BREAK_ADS_DIR = path.join(__dirname, 'public', 'break-ads');
 try { fs.mkdirSync(BREAK_ADS_DIR, { recursive: true }); } catch (_) { /* exists */ }
+const BREAK_MOSAIC_DIR = path.join(__dirname, 'public', 'break-mosaic');
+try { fs.mkdirSync(BREAK_MOSAIC_DIR, { recursive: true }); } catch (_) { /* exists */ }
 
 app.post('/api/break-ad/upload', (req, res) => {
     try {
@@ -244,6 +250,107 @@ app.post('/api/break-ad/upload', (req, res) => {
         console.error('Ad upload failed:', e.message);
         res.status(500).json({ ok: false, error: e.message });
     }
+});
+
+// ── Standings (live Bundesliga table, OpenLigaDB) ────────────────
+// Free public API, no key, returns the current league table for bl1 /
+// bl2 / bl3. We refresh in the background every 5 minutes; the slide
+// just reads state.standings.
+const STANDINGS_REFRESH_MS = 5 * 60 * 1000;
+
+function mapOpenLigaRow(row, idx) {
+    return {
+        rank: typeof row.tablePosition === 'number' ? row.tablePosition : idx + 1,
+        name: row.teamName || row.shortName || row.team || '?',
+        short: row.shortName || (row.teamName || '').slice(0, 4) || '?',
+        icon: row.teamIconUrl || '',
+        points: row.points ?? 0,
+        goals: row.goals ?? 0,
+        against: row.opponentGoals ?? 0,
+        diff: row.goalDiff ?? 0,
+        matches: row.matches ?? 0,
+        w: row.won ?? 0,
+        d: row.draw ?? 0,
+        l: row.lost ?? 0,
+    };
+}
+
+async function refreshStandings() {
+    const s = breakState.get().standings;
+    const url = `https://api.openligadb.de/getbltable/${encodeURIComponent(s.division)}/${encodeURIComponent(s.season)}`;
+    breakState.setStandingsLoading(true);
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const r = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        const rows = Array.isArray(data) ? data.map(mapOpenLigaRow) : [];
+        rows.sort((a, b) => (b.points - a.points) || (b.diff - a.diff) || (b.goals - a.goals));
+        rows.forEach((row, i) => { row.rank = i + 1; });
+        breakState.setStandings({ rows });
+    } catch (e) {
+        console.warn('[standings] refresh failed:', e.message);
+        breakState.setStandingsLoading(false);
+    }
+}
+
+let standingsTimer = null;
+function startStandingsLoop() {
+    if (standingsTimer) return;
+    refreshStandings();
+    standingsTimer = setInterval(refreshStandings, STANDINGS_REFRESH_MS);
+}
+
+app.post('/api/standings/refresh', (_req, res) => {
+    refreshStandings().then(() => res.json({ ok: true, rows: breakState.get().standings.rows.length }))
+                       .catch(e => res.status(500).json({ ok: false, error: e.message }));
+});
+app.post('/api/standings/division', (req, res) => {
+    const div = String(req.body && req.body.division || '');
+    if (!/^(bl1|bl2|bl3)$/.test(div)) return res.status(400).json({ ok: false, error: 'invalid division' });
+    breakState.setStandings({ division: div });
+    refreshStandings().then(() => res.json({ ok: true }));
+});
+
+// ── Mosaic (operator photo gallery) ───────────────────────────────
+app.post('/api/break-mosaic/upload', (req, res) => {
+    try {
+        const b = req.body || {};
+        const data = String(b.data || '');
+        const m = data.match(/^data:image\/(png|jpe?g|webp|gif|avif);base64,(.+)$/i);
+        if (!m) return res.status(400).json({ ok: false, error: 'expected data URL' });
+        const ext = m[1].toLowerCase().replace('jpeg', 'jpg');
+        const buf = Buffer.from(m[2], 'base64');
+        if (buf.length > 12 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'too large (>12MB)' });
+        const name = (b.name || ('photo-' + Date.now())).replace(/[^a-z0-9._-]/gi, '-').toLowerCase() + '.' + ext;
+        const file = path.join(BREAK_MOSAIC_DIR, name);
+        fs.writeFileSync(file, buf);
+        breakState.addMosaicFile(name);
+        res.json({ ok: true, file: name, url: '/break-mosaic/' + name });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
+app.delete('/api/break-mosaic/:name', (req, res) => {
+    const name = String(req.params.name || '').replace(/[^a-z0-9._-]/gi, '');
+    if (!name) return res.status(400).json({ ok: false });
+    try { fs.unlinkSync(path.join(BREAK_MOSAIC_DIR, name)); } catch (_) { /* may not exist */ }
+    breakState.removeMosaicFile(name);
+    res.json({ ok: true });
+});
+
+app.post('/api/break-mosaic/prune', (_req, res) => {
+    const keep = new Set(breakState.get().mosaic.files);
+    let removed = 0;
+    try {
+        for (const f of fs.readdirSync(BREAK_MOSAIC_DIR)) {
+            if (!keep.has(f)) { try { fs.unlinkSync(path.join(BREAK_MOSAIC_DIR, f)); removed++; } catch (_) {} }
+        }
+    } catch (_) {}
+    res.json({ ok: true, removed });
 });
 
 // Re-read .env and re-initialise OBS + audio so edits take effect
@@ -614,6 +721,8 @@ process.on('SIGTERM', shutdown);
 server.listen(3000, () => {
     console.log('Server is running on port 3000');
     io.emit('terminalOutput', 'Server is running on port 3000');
+    // Kick off the Bundesliga standings refresh loop
+    startStandingsLoop();
     const urls = lanUrls();
     if (urls.length) {
         urls.forEach(n => console.log('  Network: ' + n.url + '  (' + n.name + ')'));
