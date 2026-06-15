@@ -39,9 +39,11 @@ const DEFAULTS = Object.freeze({
     // `pinned` locks one (null = free rotation). `current` is the
     // index into the active list — but the client owns the tick, so
     // the server only persists the *config*, not the live pointer.
+    // Demo slides (particles/equalizer/stats/ticker) ship OFF so they
+    // don't appear unless the operator opts in.
     rotation: {
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true },
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'particles', 'equalizer', 'stats', 'ticker'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, particles: false, equalizer: false, stats: false, ticker: false },
         dwellMs: 12000,
         pinned: null,
     },
@@ -49,6 +51,15 @@ const DEFAULTS = Object.freeze({
     // /break-ads/ (uploaded via POST /api/break-ad). Empty = no logo,
     // the slide shows org name + tagline + QR only.
     ad: { orgName: '', tagline: '', url: '', logoFile: '' },
+    // Demo stat callouts for the 'stats' slide. Count up from 0 when the
+    // slide appears. Operator-editable in a later pass; for now seeded
+    // with plausible demo values so the visual reads immediately.
+    stats: [
+        { label: 'Zuschauer', value: 147 },
+        { label: 'Tore', value: 3 },
+        { label: 'Ecken', value: 12 },
+        { label: 'Freistösse', value: 8 },
+    ],
 });
 
 let state = load();
@@ -60,9 +71,27 @@ function load() {
     try {
         const raw = fs.readFileSync(STATE_FILE, 'utf8');
         const parsed = JSON.parse(raw);
-        return merge(structuredClone(DEFAULTS), parsed);
+        const merged = merge(structuredClone(DEFAULTS), parsed);
+        reconcileSlides(merged);
+        return merged;
     } catch (_) {
         return structuredClone(DEFAULTS);
+    }
+}
+
+/**
+ * Forward-compat: the slide list always tracks DEFAULTS so a new slide
+ * added in a later version appears in an existing installation, and a
+ * removed one drops out. (Arrays aren't deep-merged, so without this a
+ * persisted rotation.slides would mask new defaults forever.) The
+ * active{} map — already deep-merged — still controls which are on.
+ */
+function reconcileSlides(s) {
+    if (!s.rotation) return;
+    s.rotation.slides = [...DEFAULTS.rotation.slides];
+    if (!s.rotation.active) s.rotation.active = {};
+    for (const k of DEFAULTS.rotation.slides) {
+        if (typeof s.rotation.active[k] !== 'boolean') s.rotation.active[k] = false;
     }
 }
 
@@ -221,6 +250,19 @@ function setAdLogo(filename) {
     commit();
 }
 
+/** Replace the stats array (demo callouts for the 'stats' slide). */
+function setStats(arr) {
+    if (!Array.isArray(arr)) return;
+    state.stats = arr
+        .filter(s => s && typeof s === 'object')
+        .slice(0, 6)
+        .map(s => ({
+            label: String(s.label || '').slice(0, 24),
+            value: Math.max(0, Math.min(99999, Math.trunc(Number(s.value) || 0))),
+        }));
+    commit();
+}
+
 // ── pub/sub ───────────────────────────────────────────────────────
 
 /** Subscribe to state changes. Returns an unsubscribe fn. */
@@ -232,7 +274,7 @@ function subscribe(fn) {
 module.exports = {
     get, update, setScore,
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
-    setRotation, setAd, setAdLogo,
+    setRotation, setAd, setAdLogo, setStats,
     subscribe,
     DEFAULTS,
 };

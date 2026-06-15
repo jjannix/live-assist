@@ -255,6 +255,93 @@
         .live { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: clamp(11px, 0.9vw, 14px); font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; color: var(--warm); }
         .live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warm); box-shadow: 0 0 12px var(--warm-glow); animation: breathe 1.4s ease-in-out infinite; }
 
+        /* ═══════ Slide: particles (canvas constellation) ═══════ */
+        .slide-canvas { padding: 0; }
+        .particles-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+        .particles-overlay {
+            position: relative; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; gap: clamp(12px, 1.6vw, 24px);
+        }
+        .particles-overlay .clock {
+            font-size: clamp(120px, 16vw, 260px);
+            text-shadow: 0 0 80px rgba(7,7,12,0.8), 0 0 40px var(--accent-glow);
+        }
+
+        /* ═══════ Slide: equalizer (frequency bars) ═══════ */
+        .eq-bars {
+            display: flex; align-items: flex-end; justify-content: center;
+            gap: clamp(4px, 0.8vw, 10px);
+            height: clamp(160px, 20vw, 300px);
+        }
+        .eq-bars .bar {
+            width: clamp(10px, 1.4vw, 22px);
+            border-radius: 6px 6px 2px 2px;
+            background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+            box-shadow: 0 0 16px var(--accent-glow);
+            transform-origin: bottom;
+            /* JS sets per-bar animation-duration + delay; the keyframe
+               is a height pulse shaped like a real spectrum. */
+            animation: eq-pulse var(--eq-dur, 0.9s) ease-in-out infinite;
+            animation-delay: var(--eq-delay, 0s);
+        }
+        @keyframes eq-pulse {
+            0%, 100% { transform: scaleY(0.18); opacity: 0.7; }
+            50%      { transform: scaleY(1);    opacity: 1; }
+        }
+
+        /* ═══════ Slide: stats (counting callouts) ═══════ */
+        .stats-eyebrow {
+            font-size: clamp(13px, 1.1vw, 17px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--accent);
+        }
+        .stats-grid {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            gap: clamp(24px, 4vw, 64px) clamp(32px, 5vw, 80px);
+            max-width: 1200px;
+        }
+        .stat-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .stat-num {
+            font-family: var(--font-display);
+            font-size: clamp(56px, 7vw, 112px); font-weight: 700;
+            line-height: 1; letter-spacing: -0.02em;
+            font-variant-numeric: tabular-nums;
+            background: linear-gradient(180deg, var(--ink-0), var(--accent));
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-lbl {
+            font-size: clamp(13px, 1.1vw, 17px); font-weight: 700;
+            letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-2);
+        }
+
+        /* ═══════ Slide: ticker (scrolling marquee) ═══════ */
+        .ticker-hero { display: flex; align-items: center; justify-content: center; flex: 1; }
+        .ticker-wrap {
+            width: 100%; overflow: hidden;
+            border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+            background: var(--panel);
+            padding: clamp(16px, 1.8vw, 28px) 0;
+        }
+        .ticker-track {
+            display: inline-flex; white-space: nowrap;
+            will-change: transform;
+            animation: ticker-scroll 28s linear infinite;
+        }
+        .ticker-track span {
+            font-family: var(--font-display);
+            font-size: clamp(22px, 2.4vw, 36px); font-weight: 600;
+            color: var(--ink-0); padding: 0 32px;
+            display: inline-flex; align-items: center; gap: 32px;
+        }
+        .ticker-track span::after {
+            content: '●'; color: var(--accent); font-size: 0.5em; margin-left: 32px;
+        }
+        .ticker-track span:last-child::after { content: ''; }
+        @keyframes ticker-scroll {
+            from { transform: translateX(0); }
+            to   { transform: translateX(-50%); }
+        }
+
         /* Slide indicator (tiny dots, bottom-right) — shows which slide
            is live and how many are in the rotation. Subtle broadcast cue. */
         .indicators {
@@ -350,6 +437,38 @@
                     <div class="brand-glyph"><div class="core"></div></div>
                     <div class="brand-word">jnk</div>
                     <div class="brand-sub">Live Assist</div>
+                </div>
+            </section>
+
+            <!-- 7. Particles (canvas constellation) -->
+            <section class="slide slide-canvas" data-slide="particles">
+                <canvas class="particles-canvas" id="particlesCanvas"></canvas>
+                <div class="particles-overlay">
+                    <div class="clock" id="pClock">15:00</div>
+                    <div class="caption" id="pCap">bis Anpfiff</div>
+                </div>
+            </section>
+
+            <!-- 8. Equalizer (animated frequency bars) -->
+            <section class="slide" data-slide="equalizer">
+                <h2 class="title" id="eqTitle">HALBZEIT</h2>
+                <div class="eq-bars" id="eqBars"></div>
+                <div class="caption"><span id="eqClock">15:00</span> bis Anpfiff</div>
+            </section>
+
+            <!-- 9. Stats (counting callouts) -->
+            <section class="slide" data-slide="stats">
+                <div class="stats-eyebrow">Spielstatistik</div>
+                <div class="stats-grid" id="statsGrid"></div>
+            </section>
+
+            <!-- 10. Ticker (scrolling marquee) -->
+            <section class="slide" data-slide="ticker">
+                <div class="ticker-hero">
+                    <div class="brand-word">HALBZEIT</div>
+                </div>
+                <div class="ticker-wrap">
+                    <div class="ticker-track" id="tickerTrack"></div>
                 </div>
             </section>
         </div>
@@ -455,10 +574,21 @@
             // Ad
             renderAd(s.ad || {});
 
+            // Stats + ticker (cheap to rebuild each render)
+            renderStats(s.stats || []);
+            renderTicker(s);
+
             // Clocks
             const t = s.timer || {};
             const dur = t.durationSec || 1;
             renderClocks(liveRemaining(t), !!t.running, dur);
+            // Mirror the live countdown onto the demo slides too
+            const rem = liveRemaining(t);
+            const done = rem <= 0;
+            $('#pClock').textContent = fmt(rem); $('#pClock').classList.toggle('done', done);
+            $('#pCap').textContent = done ? 'Anpfiff' : (t.running ? 'bis Anpfiff' : 'pausiert');
+            $('#eqClock').textContent = fmt(rem);
+            $('#eqTitle').textContent = (s.title || 'HALBZEIT').toUpperCase();
 
             // Rotation
             applyRotation(s.rotation || {});
@@ -545,7 +675,146 @@
 
         function showSlide(name) {
             $$('.slide').forEach(el => el.classList.toggle('active', el.dataset.slide === name));
+            // Lifecycle: start/stop the canvas particle system so it
+            // only burns CPU while visible, and kick the stat count-up
+            // each time the stats slide appears.
+            if (name === 'particles') startParticles(); else stopParticles();
+            if (name === 'stats') animateStats();
+            buildEqualizer();   // idempotent — builds bars once
         }
+
+        // ── Particles (canvas constellation) ──────────────────────
+        // ~90 dots drifting slowly, connected by lines when nearby.
+        // Reads as "premium tech event" — a vocabulary nothing else
+        // in the deck uses (canvas vs DOM). Runs only while visible.
+        let pParticles = null, pRaf = null;
+        function startParticles() {
+            const cv = $('#particlesCanvas');
+            if (!cv) return;
+            const ctx = cv.getContext('2d');
+            const resize = () => { cv.width = cv.offsetWidth; cv.height = cv.offsetHeight; };
+            resize();
+            const COUNT = Math.max(50, Math.min(110, Math.round(cv.width * cv.height / 22000)));
+            const LINK = 140;
+            if (!pParticles || pParticles.length !== COUNT) {
+                pParticles = Array.from({ length: COUNT }, () => ({
+                    x: Math.random() * cv.width,
+                    y: Math.random() * cv.height,
+                    vx: (Math.random() - 0.5) * 0.35,
+                    vy: (Math.random() - 0.5) * 0.35,
+                }));
+            }
+            window.addEventListener('resize', resize);
+            const draw = () => {
+                ctx.clearRect(0, 0, cv.width, cv.height);
+                // Lines first (behind dots)
+                for (let i = 0; i < pParticles.length; i++) {
+                    for (let j = i + 1; j < pParticles.length; j++) {
+                        const dx = pParticles[i].x - pParticles[j].x;
+                        const dy = pParticles[i].y - pParticles[j].y;
+                        const d = Math.hypot(dx, dy);
+                        if (d < LINK) {
+                            ctx.strokeStyle = 'rgba(124,106,255,' + (0.18 * (1 - d / LINK)) + ')';
+                            ctx.lineWidth = 1;
+                            ctx.beginPath();
+                            ctx.moveTo(pParticles[i].x, pParticles[i].y);
+                            ctx.lineTo(pParticles[j].x, pParticles[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                // Dots
+                for (const p of pParticles) {
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0 || p.x > cv.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > cv.height) p.vy *= -1;
+                    ctx.fillStyle = 'rgba(180,170,255,0.7)';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2); ctx.fill();
+                }
+                pRaf = requestAnimationFrame(draw);
+            };
+            stopParticles();
+            pRaf = requestAnimationFrame(draw);
+        }
+        function stopParticles() {
+            if (pRaf) { cancelAnimationFrame(pRaf); pRaf = null; }
+        }
+
+        // ── Equalizer (animated frequency bars) ───────────────────
+        // CSS does the actual animation (cheap); JS just seeds the bars
+        // once with staggered durations/delays so they look like a real
+        // spectrum analyser, not synced robots.
+        let eqBuilt = false;
+        function buildEqualizer() {
+            if (eqBuilt) return;
+            const bars = $('#eqBars'); if (!bars) return;
+            const N = 16;
+            let html = '';
+            for (let i = 0; i < N; i++) {
+                // Taller bars toward the centre — bell curve, like a
+                // real frequency response.
+                const dist = Math.abs(i - (N - 1) / 2) / ((N - 1) / 2);
+                const heightPct = (1 - dist * 0.7) * 100;
+                const dur = (0.7 + Math.random() * 0.6).toFixed(2);
+                const delay = (Math.random() * 0.8).toFixed(2);
+                html += '<div class="bar" style="height:' + heightPct + '%;--eq-dur:' + dur + 's;--eq-delay:' + delay + 's;"></div>';
+            }
+            bars.innerHTML = html;
+            eqBuilt = true;
+        }
+
+        // ── Stats (count-up callouts) ────────────────────────────
+        function renderStats(list) {
+            const grid = $('#statsGrid');
+            grid.innerHTML = '';
+            (list || []).forEach((s, i) => {
+                const item = document.createElement('div');
+                item.className = 'stat-item';
+                item.innerHTML = '<div class="stat-num" data-target="' + (s.value || 0) + '">0</div>' +
+                                 '<div class="stat-lbl">' + (s.label || '') + '</div>';
+                grid.appendChild(item);
+            });
+        }
+        // Animate every stat number from 0 → target when the slide appears.
+        // Staggered start so they count up in sequence — satisfying.
+        function animateStats() {
+            $$('#statsGrid .stat-num').forEach((el, i) => {
+                const target = parseInt(el.dataset.target || '0', 10);
+                if (!target) { el.textContent = '0'; return; }
+                el.textContent = '0';
+                const dur = 1100;
+                const start = performance.now() + i * 120;
+                const step = now => {
+                    const t = Math.min(1, Math.max(0, (now - start) / dur));
+                    const eased = 1 - Math.pow(1 - t, 3);   // ease-out cubic
+                    el.textContent = Math.round(target * eased);
+                    if (t < 1) requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            });
+        }
+
+        // ── Ticker (scrolling marquee) ───────────────────────────
+        // Build a seamless loop: duplicate the content so translateX(-50%)
+        // lands exactly where it started. Content drawn from current
+        // state — message, score, title — so it's never empty.
+        function renderTicker(s) {
+            const track = $('#tickerTrack'); if (!track) return;
+            const items = [];
+            const t = (s.title || 'HALBZEIT').toUpperCase();
+            items.push(t);
+            const h = s.home || {}, a = s.away || {};
+            if (h.name || a.name) items.push((h.name || 'Heim') + ' ' + (h.score||0) + ' : ' + (a.score||0) + ' ' + (a.name || 'Gast'));
+            if (s.message) items.push(s.message);
+            const ad = s.ad || {};
+            if (ad.orgName) items.push('Partner: ' + ad.orgName);
+            items.push('jnk Live Assist');
+            // Duplicate for seamless scroll
+            const html = items.map(i => '<span>' + escapeHtml(i) + '</span>').join('');
+            track.innerHTML = html + html;
+        }
+        function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
         socket.on('breakState', render);
         socket.on('connect', () => socket.emit('breakStateGet'));
