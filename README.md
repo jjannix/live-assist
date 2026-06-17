@@ -165,9 +165,19 @@ Pick a backend explicitly with `AUDIO_BACKEND=voicemeeter|native|none` in `.env`
 ├── server.js                  # Express + Socket.IO server
 ├── package.json
 ├── start.bat                  # Windows launcher
+├── dev.cmd                    # x64 Node.js wrapper for dev
 ├── .env.example               # All config options
+├── .gitignore
+├── config/
+│   └── config.js              # Reads .env, exports to server
+├── docs/
+│   ├── SETUP.md               # Extended setup guide
+│   └── OBS-SETUP.md           # OBS-specific setup
+├── data/                      # Runtime state (gitignored)
+│   └── break-state.json       # Break screen state
 ├── public/                    # Frontend (PWA)
 │   ├── index.html             # Main controller
+│   ├── config.html            # In-app .env editor
 │   ├── dashboard.html         # Health dashboard
 │   ├── app.js                 # Client logic
 │   ├── style.css
