@@ -303,19 +303,19 @@
         document.querySelectorAll('[data-side]').forEach(b => b.onclick = () => socket.emit('breakScore', { side: b.dataset.side, delta: parseInt(b.dataset.delta, 10) }));
 
         // Free-text fields — debounce so we don't spam the socket per keystroke
-        function debounce(sel, build) {
+        function debounce(sel, fn) {
             const el = $(sel);
             el.addEventListener('input', () => {
                 clearTimeout(typingTimer);
-                typingTimer = setTimeout(() => patch(build(el.value)), 350);
+                typingTimer = setTimeout(() => fn(el.value), 350);
             });
         }
-        debounce('#homeName', v => ({ home: { name: v } }));
-        debounce('#awayName', v => ({ away: { name: v } }));
-        debounce('#matchLbl', v => ({ matchClock: { label: v } }));
-        debounce('#matchVal', v => ({ matchClock: { display: v } }));
-        debounce('#title',    v => ({ title: v }));
-        debounce('#message',  v => ({ message: v }));
+        debounce('#homeName', v => patch({ home: { name: v } }));
+        debounce('#awayName', v => patch({ away: { name: v } }));
+        debounce('#matchLbl', v => patch({ matchClock: { label: v } }));
+        debounce('#matchVal', v => patch({ matchClock: { display: v } }));
+        debounce('#title',    v => patch({ title: v }));
+        debounce('#message',  v => patch({ message: v }));
 
         // ── Slide rotation ──
         const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', brand: 'Brand', flowfield: 'Flowfield' };

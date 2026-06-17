@@ -466,6 +466,8 @@
 
         let prev = { home: 0, away: 0 };
         let state = {};
+        let lastState = null;
+        let activeSlide = null;
 
         function pad(n) { return String(n).padStart(2, '0'); }
         function fmt(sec) {
@@ -540,7 +542,7 @@
             renderAd(s.ad || {});
 
             // Stash latest state for slide-lifecycle code
-            window.__lastState = s;
+            lastState = s;
 
             // Clocks (clock + radial slides)
             const t = s.timer || {};
@@ -621,7 +623,7 @@
                 adPanels[adIndex].classList.add('active');
                 const cnt = $('#adCounter'); if (cnt) cnt.textContent = (adIndex + 1) + ' / ' + adPanels.length;
                 // Refresh QR for the new panel
-                const items = (window.__lastState && window.__lastState.ad && window.__lastState.ad.items) || [];
+                const items = (lastState && lastState.ad && lastState.ad.items) || [];
                 const active = items[adIndex] || {};
                 const url = active.url || '';
                 const qr = $('#adQr');
@@ -689,12 +691,12 @@
         }
 
         function showSlide(name) {
-            window.__activeSlide = name;
+            activeSlide = name;
             $$('.slide').forEach(el => el.classList.toggle('active', el.dataset.slide === name));
             // Lifecycle: start/stop the flowfield rAF loop and the ad
             // sponsor crossfade so they only burn CPU while visible.
             if (name === 'flowfield') startFlow(); else stopFlow();
-            if (name === 'ad') startAdCycle((window.__lastState && window.__lastState.ad && window.__lastState.ad.dwellMs) || 8000);
+            if (name === 'ad') startAdCycle((lastState && lastState.ad && lastState.ad.dwellMs) || 8000);
             else stopAdCycle();
         }
 
