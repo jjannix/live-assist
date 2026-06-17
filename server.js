@@ -4,7 +4,7 @@ const os = require('os');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
-const config = require('./config');
+const config = require('./config/config');
 
 // .env is the single source of truth. Loaded once at boot with
 // override:true so a hand-edited (or in-app-edited) file always wins
