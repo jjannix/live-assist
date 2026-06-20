@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/broadcast.css">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
     <style>
         /*
          * ════════════════════════════════════════════════════════════════
@@ -27,7 +26,7 @@
          *    2. radial  — countdown as a depleting ring
          *    3. score   — editorial scoreboard split
          *    4. message — full-screen pushed text
-         *    5. ad      — single sponsor (logo + name + tagline + QR)
+         *    5. ad      — single sponsor (name + tagline)
          *    6. brand   — pure attract motion (the breather)
          * ════════════════════════════════════════════════════════════════
          */
@@ -177,97 +176,38 @@
         }
         .msg-empty { color: var(--ink-3); font-style: italic; }
 
-        /* ── Slide: ad (multi-sponsor broadcast bumper) ── */
-        .ad-slide { padding: 0; position: relative; overflow: hidden; }
-        /* Diagonal light sweep across the slide — slow, ambient motion. */
-        .ad-sweep {
-            position: absolute; inset: -20% -20%;
-            background: linear-gradient(115deg,
-                transparent 30%,
-                rgba(124,106,255,0.10) 45%,
-                rgba(255,255,255,0.05) 50%,
-                rgba(124,106,255,0.10) 55%,
-                transparent 70%);
-            transform: translateX(-40%);
-            animation: ad-sweep 9s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-            pointer-events: none; z-index: 1;
+        /* ── Slide: sponsor (text-only showcase) ── */
+        .slide[data-slide="ad"] {
+            background: linear-gradient(180deg, #0a0d18 0%, #0d1022 100%);
         }
-        @keyframes ad-sweep {
-            0%   { transform: translateX(-40%); }
-            100% { transform: translateX(40%); }
+        .sponsor-eyebrow {
+            font-size: clamp(12px, 1.3vw, 18px); font-weight: 600;
+            letter-spacing: 5px; text-transform: uppercase;
+            color: rgba(255,255,255,0.40); margin-bottom: 20px;
         }
-        /* Subtle radial vignette so the logo has a quiet frame. */
-        .ad-vignette {
-            position: absolute; inset: 0; z-index: 1; pointer-events: none;
-            background: radial-gradient(ellipse 70% 60% at 50% 45%, transparent 30%, rgba(7,7,12,0.45) 100%);
+        .sponsor-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(42px, 6vw, 100px); font-weight: 700;
+            color: #fff; text-align: center; line-height: 1.05;
+            letter-spacing: -0.01em; max-width: 90%;
+            transition: opacity 0.5s ease;
         }
-        .ad-stage { position: absolute; inset: 0; z-index: 2; }
-        .ad-panel {
-            position: absolute; inset: 0;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 14px; padding: 60px;
-            opacity: 0;
-            transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+        .sponsor-tag {
+            font-size: clamp(14px, 1.5vw, 22px); font-weight: 400;
+            color: rgba(255,255,255,0.50); text-align: center;
+            margin-top: 14px; max-width: 76%; font-style: italic;
+            transition: opacity 0.5s ease;
         }
-        .ad-panel.active { opacity: 1; }
-        .ad-panel.active .ad-eyebrow,
-        .ad-panel.active .ad-name,
-        .ad-panel.active .ad-tag,
-        .ad-panel.active .ad-logo-box { animation: ad-rise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-        .ad-panel.active .ad-eyebrow { animation-delay: 0.05s; }
-        .ad-panel.active .ad-logo-box { animation-delay: 0.15s; }
-        .ad-panel.active .ad-name    { animation-delay: 0.25s; }
-        .ad-panel.active .ad-tag     { animation-delay: 0.35s; }
-        @keyframes ad-rise {
-            from { opacity: 0; transform: translateY(18px); }
-            to   { opacity: 1; transform: none; }
-        }
-        .ad-eyebrow {
-            font-size: 13px; font-weight: 700;
-            letter-spacing: 0.45em; text-transform: uppercase; color: var(--ink-3);
-            position: relative; padding-bottom: 10px;
-        }
-        .ad-eyebrow::after {
-            content: ''; position: absolute; left: 50%; bottom: 0;
-            transform: translateX(-50%);
-            width: 36px; height: 1px; background: var(--accent);
-        }
-        .ad-logo-box {
-            height: clamp(140px, 22vh, 240px);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .ad-logo-box img {
-            max-height: 100%; max-width: 56vw; object-fit: contain;
-            filter: drop-shadow(0 0 28px rgba(255,255,255,0.10));
-            animation: ad-breathe 4.5s ease-in-out infinite;
-        }
-        @keyframes ad-breathe {
-            0%, 100% { transform: scale(1); }
-            50%      { transform: scale(1.025); }
-        }
-        .ad-name {
-            font-family: var(--font-display);
-            font-size: clamp(34px, 4.2vw, 64px); font-weight: 700;
-            color: var(--ink-0); text-align: center; line-height: 1.05;
-            letter-spacing: 0.005em;
-        }
-        .ad-tag {
-            font-size: clamp(15px, 1.3vw, 20px); font-weight: 400;
-            color: var(--ink-1); text-align: center;
-            max-width: 38ch; line-height: 1.4; font-style: italic;
-        }
-        .ad-counter {
+        .sponsor-counter {
             position: absolute; bottom: 32px; left: 50%;
             transform: translateX(-50%); z-index: 3;
             font-size: 11px; font-weight: 700; letter-spacing: 0.35em;
-            color: var(--ink-3); text-transform: uppercase;
+            color: rgba(255,255,255,0.35); text-transform: uppercase;
             font-variant-numeric: tabular-nums;
         }
-        .ad-qr {
-            position: absolute !important; bottom: 28px; right: 28px; z-index: 3;
-            width: 90px !important; height: 90px !important;
-            border-radius: 10px; background: #fff; padding: 6px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+        .sponsor-empty {
+            font-size: clamp(18px, 2vw, 28px); font-weight: 600;
+            color: rgba(255,255,255,0.18);
         }
 
         /* ── Slide: flowfield (generative particle art) ── */
@@ -341,6 +281,102 @@
         }
         .indicators .pip { width: 6px; height: 6px; border-radius: 3px; background: var(--ink-3); transition: background 0.3s, width 0.3s; }
         .indicators .pip.on { background: var(--accent); width: 18px; }
+
+        /* ── Slide: weather (atmospheric, data-driven) ── */
+        /* The slide's background gradient IS the condition; a particle
+           canvas adds stars / rain / snow on top; the data overlay
+           floats above both. Scene is set via data-scene. */
+        .slide.wx-slide { padding: 0; overflow: hidden; }
+        .wx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .wx-sun {
+            position: absolute; top: 7%; right: 9%; width: 30vmin; height: 30vmin;
+            border-radius: 50%; pointer-events: none; z-index: 1; opacity: 0;
+            background: radial-gradient(circle, rgba(255,243,190,0.95) 0%, rgba(255,224,130,0.5) 35%, rgba(255,210,90,0) 70%);
+            transition: opacity 1.5s ease;
+        }
+        .wx-overlay {
+            position: relative; z-index: 2; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: clamp(40px,5vw,88px) clamp(48px,6vw,110px); gap: 40px;
+        }
+        .wx-main { display: flex; flex-direction: column; }
+        .wx-temp {
+            font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+            font-size: clamp(120px, 22vw, 360px); line-height: 0.86; letter-spacing: -0.045em;
+            color: #fff; font-variant-numeric: tabular-nums;
+            text-shadow: 0 4px 40px rgba(0,0,0,0.25);
+        }
+        .wx-temp .wx-unit { font-size: 0.42em; vertical-align: super; opacity: 0.7; margin-left: 0.04em; }
+        .wx-label { font-size: clamp(20px, 2.4vw, 36px); font-weight: 600; color: rgba(255,255,255,0.94); margin-top: 0.15em; letter-spacing: 0.01em; }
+        .wx-feels { font-size: clamp(13px, 1.3vw, 20px); font-weight: 500; color: rgba(255,255,255,0.6); margin-top: 0.5em; font-variant-numeric: tabular-nums; }
+        .wx-side { display: flex; flex-direction: column; align-items: flex-end; gap: clamp(18px,2vw,28px); }
+        .wx-hourly { display: flex; gap: clamp(14px,1.8vw,34px); align-items: flex-end; }
+        .wx-hour { display: flex; flex-direction: column; align-items: center; gap: 10px; color: rgba(255,255,255,0.78); transition: transform 0.3s, color 0.3s; }
+        .wx-hour.now { color: #fff; transform: scale(1.1); }
+        .wx-hour .h-time { font-size: clamp(11px,1vw,15px); font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.65; }
+        .wx-hour .h-ico { width: clamp(26px,2.4vw,40px); height: clamp(26px,2.4vw,40px); opacity: 0.9; }
+        .wx-hour .h-ico svg { width: 100%; height: 100%; }
+        .wx-hour .h-temp { font-size: clamp(18px,2vw,30px); font-weight: 700; font-variant-numeric: tabular-nums; }
+        .wx-chips { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+        .wx-chip {
+            font-size: clamp(13px,1.3vw,18px); font-weight: 600; color: rgba(255,255,255,0.82);
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.16);
+            padding: 8px 18px; border-radius: 100px; font-variant-numeric: tabular-nums;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        }
+        .wx-chip:empty { display: none; }
+        .wx-hilo { font-size: clamp(13px,1.3vw,18px); font-weight: 600; color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+        .wx-stale { position: absolute; bottom: clamp(20px,2vw,32px); right: clamp(48px,6vw,110px); z-index: 3; font-size: clamp(11px,1vw,14px); font-weight: 600; color: rgba(255,255,255,0.5); font-variant-numeric: tabular-nums; }
+
+        /* Per-scene backgrounds (the condition is the background) */
+        .slide.wx-slide[data-scene="clear-day"]   { background: linear-gradient(155deg, #2f6fb0 0%, #5a9fd4 45%, #9cc4e8 100%); }
+        .slide.wx-slide[data-scene="clear-day"] .wx-sun { opacity: 0.9; }
+        .slide.wx-slide[data-scene="clear-night"] { background: linear-gradient(180deg, #06091a 0%, #121833 60%, #1c2347 100%); }
+        .slide.wx-slide[data-scene="partly-day"]   { background: linear-gradient(180deg, #4a7aa8 0%, #7fa8c8 60%, #a9c4dc 100%); }
+        .slide.wx-slide[data-scene="partly-day"] .wx-sun { opacity: 0.5; }
+        .slide.wx-slide[data-scene="partly-night"] { background: linear-gradient(180deg, #0a1024 0%, #1a2140 100%); }
+        .slide.wx-slide[data-scene="cloudy"] { background: linear-gradient(180deg, #5b6573 0%, #8a93a0 100%); }
+        .slide.wx-slide[data-scene="fog"]    { background: linear-gradient(180deg, #8a93a0 0%, #c2c8d0 100%); }
+        .slide.wx-slide[data-scene="rain"]   { background: linear-gradient(180deg, #232a36 0%, #3d4756 100%); }
+        .slide.wx-slide[data-scene="snow"]   { background: linear-gradient(180deg, #445470 0%, #8090a8 100%); }
+        .slide.wx-slide[data-scene="thunder"]{ background: linear-gradient(180deg, #141426 0%, #26263f 100%); }
+        .slide.wx-slide[data-scene=""]       { background: linear-gradient(180deg, #2a3140 0%, #445065 100%); }   /* loading */
+
+        /* Thunder flash — subtle, infrequent, never strobe-fast. */
+        .slide.wx-slide[data-scene="thunder"]::after {
+            content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+            background: rgba(255,255,255,0); animation: wx-flash 8s ease-in-out infinite;
+        }
+        @keyframes wx-flash {
+            0%, 86%, 100% { background: rgba(255,255,255,0); }
+            88% { background: rgba(255,255,255,0.55); }
+            90% { background: rgba(255,255,255,0.08); }
+            92% { background: rgba(255,255,255,0.4); }
+            95% { background: rgba(255,255,255,0); }
+        }
+
+        /* ── Slide: mercury (liquid chrome ambient) ── */
+        /* The blur()+contrast() filter on the canvas context turns
+           overlapping soft silver circles into crisp, organic, merging
+           blobs — the liquid-metal look. A screen-blend sheen adds the
+           polished-metal highlight; a vignette focuses the centre. */
+        .slide.mercury-slide {
+            padding: 0; overflow: hidden;
+            background: radial-gradient(ellipse at 50% 42%, #0d111c 0%, #070a12 65%, #03040a 100%);
+        }
+        .mercury-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+        .mercury-sheen {
+            position: absolute; inset: 0; z-index: 2; pointer-events: none;
+            background:
+                radial-gradient(ellipse 58% 38% at 30% 20%, rgba(255,255,255,0.22), transparent 55%),
+                linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 42%, rgba(10,14,24,0.30) 100%);
+            mix-blend-mode: screen;
+        }
+        .mercury-vignette {
+            position: absolute; inset: 0; z-index: 3; pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.50) 100%);
+        }
+
     </style>
 </head>
 <body>
@@ -410,12 +446,12 @@
             </section>
 
             <!-- 5. Ad (multi-sponsor bumper) -->
-            <section class="slide ad-slide" data-slide="ad">
-                <div class="ad-sweep" id="adSweep"></div>
-                <div class="ad-vignette"></div>
-                <div class="ad-stage" id="adStage"></div>
-                <div class="ad-counter" id="adCounter" hidden></div>
-                <canvas class="ad-qr" id="adQr" hidden></canvas>
+            <section class="slide" data-slide="ad">
+                <div class="sponsor-eyebrow" id="adEyebrow">Präsentiert von</div>
+                <div class="sponsor-name" id="adName">—</div>
+                <div class="sponsor-tag" id="adTag"></div>
+                <div class="sponsor-counter" id="adCounter" hidden></div>
+                <div class="sponsor-empty" id="adEmpty" hidden>Sponsor</div>
             </section>
 
             <!-- 6. Brand (attract) -->
@@ -436,6 +472,35 @@
                 </div>
             </section>
 
+            <!-- 8. Weather (atmospheric, Open-Meteo) -->
+            <section class="slide wx-slide" data-slide="weather" data-scene="">
+                <canvas class="wx-canvas" id="weatherCanvas"></canvas>
+                <div class="wx-sun" aria-hidden="true"></div>
+                <div class="wx-overlay">
+                    <div class="wx-main">
+                        <div class="wx-temp"><span id="wxTemp">—</span><span class="wx-unit">°</span></div>
+                        <div class="wx-label" id="wxLabel">—</div>
+                        <div class="wx-feels" id="wxFeels"></div>
+                    </div>
+                    <div class="wx-side">
+                        <div class="wx-hourly" id="wxHourly"></div>
+                        <div class="wx-chips">
+                            <span class="wx-chip" id="wxWind"></span>
+                            <span class="wx-chip" id="wxHumidity"></span>
+                        </div>
+                        <div class="wx-hilo" id="wxHiLo"></div>
+                    </div>
+                </div>
+                <div class="wx-stale" id="wxStale" hidden></div>
+            </section>
+
+            <!-- 9. Mercury (liquid chrome ambient) -->
+            <section class="slide mercury-slide" data-slide="mercury">
+                <canvas class="mercury-canvas" id="mercuryCanvas"></canvas>
+                <div class="mercury-sheen" aria-hidden="true"></div>
+                <div class="mercury-vignette" aria-hidden="true"></div>
+            </section>
+
         </div>
 
         <!-- Persistent lower-third -->
@@ -452,6 +517,7 @@
                 <div class="live"><span class="dot"></span><span>Break</span></div>
             </div>
         </footer>
+
     </main>
 
     <!-- Rotation indicator -->
@@ -463,6 +529,10 @@
         const $ = s => document.querySelector(s);
         const $$ = s => document.querySelectorAll(s);
         const socket = io();
+
+        // Receive full state from the server (emitted on connect and on
+        // every change via breakState.subscribe).
+        socket.on('breakState', render);
 
         let prev = { home: 0, away: 0 };
         let state = {};
@@ -539,7 +609,11 @@
             $('#lowerScore').textContent = hs + ':' + as;
 
             // Ad (multi-sponsor bumper)
-            renderAd(s.ad || {});
+            try { renderAd(s.ad || {}); } catch (e) { console.error('renderAd crash:', e && e.message ? e.message : e); }
+
+            // Weather (atmospheric slide)
+            try { renderWeather(s.weather); } catch (_) { /* never let a
+                stale cache or missing markup kill the rotation */ }
 
             // Stash latest state for slide-lifecycle code
             lastState = s;
@@ -553,87 +627,74 @@
             applyRotation(s.rotation || {});
         }
 
-        // ── Ad (multi-sponsor broadcast bumper) ─────────────────────
-        // Renders one panel per sponsor in state.ad.items, crossfading
-        // between them on a per-sponsor dwell timer. The QR is drawn
-        // from the active sponsor's URL (if any) and rebuilt on each
-        // panel change. A 'Präsentiert von' eyebrow + diagonal light
-        // sweep + breathing logo give the premium broadcast feel.
-        let adTimer = null, adIndex = 0, adPanels = [], adCurrentUrl = '';
+        // ── Ad (text sponsor cycling) ───────────────────────────
+        let adTimer = null, adIndex = 0, adItems = [], adPrev = [];
         function renderAd(ad) {
             ad = ad || {};
-            const stage = $('#adStage');
-            const items = Array.isArray(ad.items) ? ad.items : [];
-            // Placeholder when no sponsors configured
-            if (items.length === 0) {
-                if (adTimer) { clearInterval(adTimer); adTimer = null; }
-                adPanels = [];
+            adItems = Array.isArray(ad.items)
+                ? ad.items.filter(s => (s.orgName || '').trim())
+                : [];
+            // Reset index only when items change (not on every state update)
+            const changed = adItems.length !== adPrev.length ||
+                adItems.some((s, i) => s.orgName !== (adPrev[i] && adPrev[i].orgName));
+            if (changed) {
                 adIndex = 0;
-                stage.innerHTML =
-                    '<div class="ad-panel active"><div class="ad-eyebrow">Präsentiert von</div>' +
-                    '<div class="ad-logo-box" style="font-family:var(--font-display);font-size:clamp(40px,5vw,72px);font-weight:700;color:var(--ink-3)">Dein Sponsor</div>' +
-                    '<div class="ad-name" style="color:var(--ink-3)">Logo hier</div>' +
-                    '<div class="ad-tag">In der App unter „Sponsor“ hinzufügen</div></div>';
-                const qr = $('#adQr'); if (qr) qr.hidden = true;
-                const cnt = $('#adCounter'); if (cnt) cnt.hidden = true;
+                if (adTimer) { clearInterval(adTimer); adTimer = null; }
+            }
+            adPrev = adItems.map(s => ({ orgName: s.orgName }));
+            showSponsor(false);
+            if (activeSlide === 'ad' && !adTimer && adItems.length >= 2) startAdCycle();
+        }
+        function showSponsor(fade) {
+            const empty = $('#adEmpty');
+            const name  = $('#adName');
+            const tag   = $('#adTag');
+            const brow  = $('#adEyebrow');
+            const cnt   = $('#adCounter');
+            if (!name) return;
+            if (adItems.length === 0) {
+                if (empty) empty.hidden = false;
+                if (name)  { name.hidden = true; name.style.opacity = '0'; }
+                if (tag)   { tag.hidden  = true; tag.style.opacity  = '0'; }
+                if (brow)  brow.hidden = true;
+                if (cnt)   cnt.hidden  = true;
                 return;
             }
-            // (Re)build panels only when the item count or filenames change
-            const sig = items.map(x => (x.logoFile || '') + '|' + (x.orgName || '')).join('§');
-            if (stage.dataset.sig !== sig) {
-                stage.innerHTML = items.map((s, i) =>
-                    '<div class="ad-panel' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '">' +
-                    '<div class="ad-eyebrow">Präsentiert von</div>' +
-                    '<div class="ad-logo-box">' + (s.logoFile ? '<img src="/break-ads/' + s.logoFile + '?t=' + Date.now() + '" alt="" onerror="this.parentElement.innerHTML=\'<div style=\\\'font-family:var(--font-display);font-size:clamp(36px,4vw,56px);font-weight:700;color:var(--ink-3)\\\'>' + escapeHtml(s.orgName || '').replace(/'/g, '') + '</div>\'">' : '<div style="font-family:var(--font-display);font-size:clamp(36px,4vw,56px);font-weight:700;color:var(--ink-3)">' + escapeHtml(s.orgName || '') + '</div>') + '</div>' +
-                    '<div class="ad-name">' + escapeHtml(s.orgName || '') + '</div>' +
-                    '<div class="ad-tag">' + escapeHtml(s.tagline || '') + '</div>' +
-                    '</div>'
-                ).join('');
-                stage.dataset.sig = sig;
-                adPanels = Array.from(stage.querySelectorAll('.ad-panel'));
-                adIndex = 0;
+            const idx = Math.min(adIndex, adItems.length - 1);
+            const s = adItems[idx] || {};
+            if (empty) empty.hidden = true;
+            if (brow)  brow.hidden  = false;
+            if (name) {
+                name.textContent = s.orgName || '';
+                name.hidden = false;
+                name.style.opacity = fade ? '0' : '1';
+                if (fade) setTimeout(() => { name.style.opacity = '1'; }, 20);
             }
-            // Counter (only when more than one sponsor)
-            const cnt = $('#adCounter');
-            if (cnt) {
-                if (items.length > 1) { cnt.hidden = false; cnt.textContent = (adIndex + 1) + ' / ' + items.length; }
-                else cnt.hidden = true;
+            if (tag) {
+                tag.textContent = s.tagline || '';
+                tag.hidden = false;
+                tag.style.opacity = fade ? '0' : '1';
+                if (fade) setTimeout(() => { tag.style.opacity = '1'; }, 20);
             }
-            // QR from active sponsor
-            const active = items[adIndex];
-            const url = (active && active.url) || '';
-            const qr = $('#adQr');
-            if (url && window.QRCode) {
-                if (url !== adCurrentUrl) {
-                    adCurrentUrl = url;
-                    QRCode.toCanvas(qr, url, { width: 90, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
-                }
-                qr.hidden = false;
-            } else {
-                qr.hidden = true;
-            }
+            if (cnt) { cnt.hidden = adItems.length < 2; cnt.textContent = (idx + 1) + ' / ' + adItems.length; }
         }
-        function startAdCycle(dwell) {
+        function startAdCycle() {
             if (adTimer) { clearInterval(adTimer); adTimer = null; }
-            if (adPanels.length <= 1) return;
+            if (adItems.length < 2) return;
+            const dwell = (lastState && lastState.ad && lastState.ad.dwellMs) || 8000;
             adTimer = setInterval(() => {
-                if (adPanels.length === 0) return;
-                adPanels[adIndex].classList.remove('active');
-                adIndex = (adIndex + 1) % adPanels.length;
-                adPanels[adIndex].classList.add('active');
-                const cnt = $('#adCounter'); if (cnt) cnt.textContent = (adIndex + 1) + ' / ' + adPanels.length;
-                // Refresh QR for the new panel
-                const items = (lastState && lastState.ad && lastState.ad.items) || [];
-                const active = items[adIndex] || {};
-                const url = active.url || '';
-                const qr = $('#adQr');
-                if (url && window.QRCode && url !== adCurrentUrl) {
-                    adCurrentUrl = url;
-                    QRCode.toCanvas(qr, url, { width: 90, margin: 1, color: { dark: '#000', light: '#fff' } }, () => {});
-                } else if (!url) {
-                    qr.hidden = true;
-                }
-            }, dwell || 8000);
+                const name = $('#adName');
+                const tag  = $('#adTag');
+                name.style.opacity = '0';
+                tag.style.opacity  = '0';
+                setTimeout(() => {
+                    adIndex = (adIndex + 1) % adItems.length;
+                    const s = adItems[adIndex] || {};
+                    if (name) { name.textContent = s.orgName || ''; name.style.opacity = '1'; }
+                    if (tag)  { tag.textContent  = s.tagline || ''; tag.style.opacity  = '1'; }
+                    const cnt = $('#adCounter'); if (cnt) cnt.textContent = (adIndex + 1) + ' / ' + adItems.length;
+                }, 500);
+            }, dwell);
         }
         function stopAdCycle() { if (adTimer) { clearInterval(adTimer); adTimer = null; } }
 
@@ -696,11 +757,264 @@
             // Lifecycle: start/stop the flowfield rAF loop and the ad
             // sponsor crossfade so they only burn CPU while visible.
             if (name === 'flowfield') startFlow(); else stopFlow();
-            if (name === 'ad') startAdCycle((lastState && lastState.ad && lastState.ad.dwellMs) || 8000);
+            if (name === 'ad') startAdCycle();
             else stopAdCycle();
+            if (name === 'weather') startWeatherCanvas(state.weather && state.weather.scene);
+            else stopWeatherCanvas();
+            if (name === 'mercury') startMercury(); else stopMercury();
         }
 
+        // ── Weather (atmospheric slide) ────────────────────────────
+        // Render the data overlay + switch the particle canvas per scene.
+        // The canvas only runs while the slide is active (lifecycle hook
+        // in showSlide), mirroring flowfield's start/stop pattern.
+        let wxRaf = null, wxParts = [], wxScene = '';
+
+        const WX_ICONS = {
+            clear:      '<circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M19.4 4.6L17.3 6.7M6.7 17.3l-2.1 2.1"/>',
+            clearNight: '<path d="M20.5 14.5A8 8 0 1 1 9.5 3.5 6.5 6.5 0 0 0 20.5 14.5z"/>',
+            partly:     '<circle cx="8" cy="8" r="3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M12.5 3.5l-1.4 1.4M4.9 11.1l-1.4 1.4"/><path d="M16.5 19a3.5 3.5 0 0 0 0-7 4.5 4.5 0 0 0-8.6 1.2A3.2 3.2 0 0 0 8 19z"/>',
+            cloudy:     '<path d="M16.5 19a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.4A3.5 3.5 0 0 0 7.5 19z"/>',
+            fog:        '<path d="M16.5 15a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.4A3.5 3.5 0 0 0 7.5 15z"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="6" y1="21" x2="18" y2="21"/>',
+            rain:       '<path d="M16.5 14a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.4A3.5 3.5 0 0 0 7.5 14z"/><line x1="8" y1="17.5" x2="7" y2="21"/><line x1="12" y1="17.5" x2="11" y2="21"/><line x1="16" y1="17.5" x2="15" y2="21"/>',
+            snow:       '<path d="M16.5 14a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.4A3.5 3.5 0 0 0 7.5 14z"/><circle cx="8" cy="19" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="20.5" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="19" r="1" fill="currentColor" stroke="none"/>',
+            thunder:    '<path d="M16.5 13a4 4 0 0 0 0-8 5 5 0 0 0-9.6 1.4A3.5 3.5 0 0 0 7.5 13z"/><path d="M11.5 14l-2 5h3l-1 4 4-6.5h-3l1-2.5z" fill="currentColor" stroke="none"/>',
+        };
+        function wxCodeToIcon(code, isDay) {
+            if (code == null) return 'cloudy';
+            if (code <= 1) return isDay ? 'clear' : 'clearNight';
+            if (code === 2) return 'partly';
+            if (code === 3) return 'cloudy';
+            if (code === 45 || code === 48) return 'fog';
+            if (code >= 51 && code <= 67) return 'rain';
+            if (code >= 71 && code <= 77) return 'snow';
+            if (code >= 80 && code <= 82) return 'rain';
+            if (code >= 85 && code <= 86) return 'snow';
+            if (code >= 95) return 'thunder';
+            return 'cloudy';
+        }
+        function wxIconSvg(code, isDay) {
+            const path = WX_ICONS[wxCodeToIcon(code, isDay)] || WX_ICONS.cloudy;
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+        }
+
+        function renderWeather(w) {
+            w = w || {};
+            const slide = document.querySelector('.slide[data-slide="weather"]');
+            // Bail if the weather slide isn't in the DOM — protects
+            // against a stale cached page that predates this slide,
+            // which would make every $('#wx…') call crash render().
+            if (!slide) return;
+            slide.dataset.scene = w.scene || '';
+
+            $('#wxTemp').textContent = (typeof w.temp === 'number') ? String(Math.round(w.temp)) : '—';
+            $('#wxLabel').textContent = w.label || (typeof w.temp === 'number' ? '' : 'Lädt …');
+            $('#wxFeels').textContent = (typeof w.feelsLike === 'number') ? ('gefühlt ' + Math.round(w.feelsLike) + '°') : '';
+
+            const hWrap = $('#wxHourly');
+            const hourly = Array.isArray(w.hourly) ? w.hourly : [];
+            hWrap.innerHTML = hourly.slice(0, 5).map((h, i) => {
+                const iso = h.time || '';
+                const t = iso.length >= 16 ? iso.slice(11, 16) : '--:--';   // 2026-06-20T15:00 → 15:00
+                const isNow = i === 0;
+                return '<div class="wx-hour' + (isNow ? ' now' : '') + '">' +
+                    '<div class="h-time">' + (isNow ? 'JETZT' : t) + '</div>' +
+                    '<div class="h-ico">' + wxIconSvg(h.code, w.isDay) + '</div>' +
+                    '<div class="h-temp">' + (typeof h.temp === 'number' ? Math.round(h.temp) + '°' : '—') + '</div>' +
+                    '</div>';
+            }).join('');
+
+            $('#wxWind').textContent = (typeof w.wind === 'number')
+                ? (Math.round(w.wind) + ' km/h ' + (w.windDir || '')) : '';
+            $('#wxHumidity').textContent = (typeof w.humidity === 'number') ? (w.humidity + ' %') : '';
+
+            const hi = (typeof w.high === 'number') ? Math.round(w.high) : null;
+            const lo = (typeof w.low === 'number') ? Math.round(w.low) : null;
+            $('#wxHiLo').textContent = (hi != null && lo != null) ? ('↑ ' + hi + '°   ↓ ' + lo + '°') : '';
+
+            const stale = $('#wxStale');
+            if (w.updatedAt) {
+                const mins = Math.round((Date.now() - w.updatedAt) / 60000);
+                if (mins > 15) { stale.hidden = false; stale.textContent = 'vor ' + mins + ' min'; }
+                else stale.hidden = true;
+            } else stale.hidden = true;
+
+            // If the slide is live, (re)seed the particle layer for the new scene.
+            if (activeSlide === 'weather') startWeatherCanvas(w.scene);
+        }
+
+        // Particle canvas: stars (night), rain streaks, or snowflakes.
+        // Other scenes are pure CSS (gradient + sun glow + thunder flash).
+        function buildWeatherParticles(cv, scene) {
+            wxParts = [];
+            const area = cv.width * cv.height;
+            if (scene === 'clear-night' || scene === 'partly-night') {
+                const N = Math.min(240, Math.round(area / 8000));
+                for (let i = 0; i < N; i++) wxParts.push({
+                    x: Math.random()*cv.width, y: Math.random()*cv.height,
+                    r: Math.random()*1.4 + 0.3, tw: Math.random()*Math.PI*2, sp: 0.4 + Math.random()*1.6
+                });
+            } else if (scene === 'rain' || scene === 'thunder') {
+                const N = Math.min(420, Math.round(area / 3800));
+                for (let i = 0; i < N; i++) wxParts.push({
+                    x: Math.random()*cv.width, y: Math.random()*cv.height,
+                    len: 12 + Math.random()*24, sp: 9 + Math.random()*11
+                });
+            } else if (scene === 'snow') {
+                const N = Math.min(260, Math.round(area / 7000));
+                for (let i = 0; i < N; i++) wxParts.push({
+                    x: Math.random()*cv.width, y: Math.random()*cv.height,
+                    r: 1 + Math.random()*3, sp: 0.5 + Math.random()*1.6,
+                    drift: Math.random()*Math.PI*2, driftSp: 0.4 + Math.random()*1
+                });
+            }
+        }
+        function drawWeather(ctx, cv, scene) {
+            if (scene === 'clear-night' || scene === 'partly-night') {
+                for (const p of wxParts) {
+                    p.tw += 0.02 * p.sp;
+                    const a = 0.35 + 0.65*Math.abs(Math.sin(p.tw));
+                    ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')';
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+                }
+            } else if (scene === 'rain' || scene === 'thunder') {
+                ctx.strokeStyle = 'rgba(185,205,235,0.45)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                for (const p of wxParts) {
+                    ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 2.4, p.y + p.len);
+                    p.y += p.sp; p.x -= 0.5;
+                    if (p.y > cv.height) { p.y = -p.len; p.x = Math.random()*cv.width; }
+                    if (p.x < -4) p.x = cv.width + 4;
+                }
+                ctx.stroke();
+            } else if (scene === 'snow') {
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                for (const p of wxParts) {
+                    p.drift += 0.012 * p.driftSp;
+                    p.x += Math.sin(p.drift) * 0.7;
+                    p.y += p.sp;
+                    if (p.y > cv.height) { p.y = -p.r; p.x = Math.random()*cv.width; }
+                    if (p.x > cv.width) p.x = 0; else if (p.x < 0) p.x = cv.width;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+                }
+            }
+        }
+        function startWeatherCanvas(scene) {
+            const cv = $('#weatherCanvas');
+            if (!cv) return;
+            scene = scene || '';
+            // CSS-only scenes (clear-day, cloudy, fog, …) need no canvas loop.
+            const needsCanvas = scene === 'clear-night' || scene === 'partly-night'
+                || scene === 'rain' || scene === 'thunder' || scene === 'snow';
+            stopWeatherCanvas();
+            if (!needsCanvas) { wxScene = scene; return; }
+            const ctx = cv.getContext('2d');
+            const resize = () => { cv.width = cv.offsetWidth; cv.height = cv.offsetHeight; };
+            resize();
+            wxScene = scene;
+            buildWeatherParticles(cv, scene);
+            const draw = () => {
+                ctx.clearRect(0, 0, cv.width, cv.height);
+                drawWeather(ctx, cv, wxScene);
+                wxRaf = requestAnimationFrame(draw);
+            };
+            wxRaf = requestAnimationFrame(draw);
+        }
+        function stopWeatherCanvas() { if (wxRaf) { cancelAnimationFrame(wxRaf); wxRaf = null; } }
+
+        // ── Mercury (liquid chrome) ────────────────────────────────
+        // The blur()+contrast() metaball trick: draw overlapping soft
+        // silver circles under a high-contrast filter and the blurred
+        // halos snap into crisp, organic blobs that merge and split —
+        // the signature liquid-metal surface tension look. Blobs drift
+        // slowly with a gentle mutual attraction so they reach toward
+        // each other and coalesce. Rendered at reduced internal res
+        // (mercury is soft, so downscaling is invisible and the blur
+        // filter is far cheaper) and only while the slide is active.
+        let mBlobs = [], mRaf = null;
+        function startMercury() {
+            const cv = $('#mercuryCanvas');
+            if (!cv) return;
+            const ctx = cv.getContext('2d');
+            const SCALE = 0.6;            // internal res — blur is the costly part
+            const resize = () => { cv.width = Math.max(1, cv.offsetWidth * SCALE); cv.height = Math.max(1, cv.offsetHeight * SCALE); };
+            resize();
+
+            const want = 9;
+            if (mBlobs.length !== want) {
+                mBlobs = [];
+                const W = cv.width, H = cv.height;
+                for (let i = 0; i < want; i++) mBlobs.push({
+                    x: Math.random() * W, y: Math.random() * H,
+                    vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5,
+                    r: W * (0.075 + Math.random() * 0.06),
+                    phase: Math.random() * Math.PI * 2,
+                });
+            }
+
+            let t0 = performance.now();
+            const draw = () => {
+                const t = (performance.now() - t0) / 1000;
+                const W = cv.width, H = cv.height;
+
+                // Clear to the dark base (no filter).
+                ctx.filter = 'none';
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = '#0a0e18';
+                ctx.fillRect(0, 0, W, H);
+
+                // Soft mutual attraction so nearby blobs reach toward
+                // each other and merge — the mercury behaviour. n is
+                // small (~9), so O(n²) is nothing.
+                for (let i = 0; i < mBlobs.length; i++) {
+                    for (let j = i + 1; j < mBlobs.length; j++) {
+                        const a = mBlobs[i], b = mBlobs[j];
+                        const dx = b.x - a.x, dy = b.y - a.y;
+                        const d = Math.hypot(dx, dy) || 1;
+                        const range = (a.r + b.r) * 2.0;
+                        if (d < range) {
+                            const f = 0.018 * (range - d) / range;
+                            const ux = dx / d, uy = dy / d;
+                            a.vx += ux * f; a.vy += uy * f;
+                            b.vx -= ux * f; b.vy -= uy * f;
+                        }
+                    }
+                }
+
+                // The liquid surface: blur + high contrast = metaballs.
+                ctx.filter = 'blur(' + (W * 0.009).toFixed(1) + 'px) contrast(28)';
+                ctx.fillStyle = '#c6cedb';
+                for (const b of mBlobs) {
+                    b.phase += 0.006;
+                    // gentle wandering
+                    b.vx += Math.sin(b.phase + t * 0.3) * 0.010;
+                    b.vy += Math.cos(b.phase * 1.3 + t * 0.27) * 0.010;
+                    // friction keeps the drift calm
+                    b.vx *= 0.975; b.vy *= 0.975;
+                    b.x += b.vx; b.y += b.vy;
+                    // wrap with margin so blobs re-enter the frame
+                    const m = b.r;
+                    if (b.x < -m) b.x = W + m;
+                    if (b.x > W + m) b.x = -m;
+                    if (b.y < -m) b.y = H + m;
+                    if (b.y > H + m) b.y = -m;
+                    // breathing radius
+                    const rr = Math.max(2, b.r * (1 + 0.08 * Math.sin(b.phase * 0.7 + t)));
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.filter = 'none';
+
+                mRaf = requestAnimationFrame(draw);
+            };
+            stopMercury();
+            mRaf = requestAnimationFrame(draw);
+        }
+        function stopMercury() { if (mRaf) { cancelAnimationFrame(mRaf); mRaf = null; } }
+
         // ── Flowfield (generative particle art) ───────────────────
+        let fParticles = null, fRaf = null;
         function startFlow() {
             const cv = $('#flowCanvas');
             if (!cv) return;
@@ -746,6 +1060,15 @@
         // Wall clock
         function wall() { const d = new Date(); $('#wallclock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()); }
         wall(); setInterval(wall, 10000);
+
+        // Local clock tick — the server only pushes on state changes
+        // (start / pause / reset), so we count down every 250 ms for a
+        // smooth on-screen display.
+        setInterval(() => {
+            const t = state.timer;
+            if (!t || !t.running) return;
+            renderClocks(liveRemaining(t), true, t.durationSec || 900);
+        }, 250);
     })();
     </script>
 </body>
