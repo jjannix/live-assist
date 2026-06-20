@@ -377,71 +377,69 @@
             background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.50) 100%);
         }
 
-        /* ── Slide: nebel (blurred colour fields, pure CSS) ── */
-        /* Soft, drifting fog of blurred colour blobs — no canvas, no rAF.
-           Drift animations run at 12–20 s so the motion is perceptible
-           but calm. A perfect quiet background layer to run behind
-           sponsor / weather content if needed. */
+        /* ── Slide: nebel (drifting colour fields, pure CSS) ── */
+        /* Soft fog of gradient blobs — no filter:blur (which can
+           suppress CSS animation compositing in some browsers), no
+           canvas, no rAF. Radial gradients give the same diffuse
+           look without the rendering tax. */
         .slide.nebel-slide {
             padding: 0; overflow: hidden;
-            background: #060812;
+            background: #080a14;
         }
         .nebel-blob {
             position: absolute;
             border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.35;
             will-change: transform;
         }
         .nebel-blob:nth-child(1) {
-            width: 65vmin; height: 55vmin;
-            background: #3d2c6a;
-            top: -8%; left: -10%;
-            animation: nebel-drift-1 14s ease-in-out infinite alternate;
+            width: 64vmin; height: 56vmin;
+            background: radial-gradient(circle at 40% 45%, rgba(123,94,168,0.55) 0%, rgba(123,94,168,0) 68%);
+            top: 4%; left: -18%;
+            animation: nebel-drift-1 7s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(2) {
             width: 70vmin; height: 60vmin;
-            background: #23555c;
-            bottom: -5%; right: -12%;
-            animation: nebel-drift-2 18s ease-in-out infinite alternate;
+            background: radial-gradient(circle at 60% 50%, rgba(54,128,140,0.50) 0%, rgba(54,128,140,0) 65%);
+            bottom: -2%; right: -14%;
+            animation: nebel-drift-2 9s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(3) {
-            width: 48vmin; height: 62vmin;
-            background: #6a3c4a;
-            top: 30%; left: 45%;
-            animation: nebel-drift-3 12s ease-in-out infinite alternate;
+            width: 52vmin; height: 64vmin;
+            background: radial-gradient(circle at 50% 40%, rgba(168,88,112,0.50) 0%, rgba(168,88,112,0) 70%);
+            top: 22%; left: 42%;
+            animation: nebel-drift-3 6s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(4) {
-            width: 40vmin; height: 45vmin;
-            background: #2e4a5c;
-            bottom: 18%; left: 5%;
-            animation: nebel-drift-4 20s ease-in-out infinite alternate;
+            width: 56vmin; height: 48vmin;
+            background: radial-gradient(circle at 35% 55%, rgba(74,122,148,0.50) 0%, rgba(74,122,148,0) 66%);
+            bottom: 12%; left: -8%;
+            animation: nebel-drift-4 11s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(5) {
-            width: 52vmin; height: 38vmin;
-            background: #4a354a;
-            top: -2%; right: 5%;
-            animation: nebel-drift-5 16s ease-in-out infinite alternate;
+            width: 54vmin; height: 44vmin;
+            background: radial-gradient(circle at 55% 45%, rgba(138,90,122,0.50) 0%, rgba(138,90,122,0) 68%);
+            top: -2%; right: 6%;
+            animation: nebel-drift-5 8s ease-in-out infinite alternate;
         }
         @keyframes nebel-drift-1 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(22%, 18%) scale(1.2); }
+            100% { transform: translate(50%, 25%) scale(1.3); }
         }
         @keyframes nebel-drift-2 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-20%, -14%) scale(1.15); }
+            100% { transform: translate(-45%, -20%) scale(1.25); }
         }
         @keyframes nebel-drift-3 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-14%, 20%) scale(1.25); }
+            100% { transform: translate(-25%, 38%) scale(1.35); }
         }
         @keyframes nebel-drift-4 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(18%, -16%) scale(1.18); }
+            100% { transform: translate(38%, -25%) scale(1.25); }
         }
         @keyframes nebel-drift-5 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-12%, 18%) scale(1.15); }
+            100% { transform: translate(-30%, 32%) scale(1.25); }
         }
         /* Text overlay sits above the blobs, centred. */
         .nebel-text {
