@@ -44,8 +44,8 @@ const DEFAULTS = Object.freeze({
     rotation: {
         // The slides you've curated as the core deck. The others are
         // opt-in from the Slides (rotation) panel in the operator page.
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true },
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield', 'nebel'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true, nebel: true },
         dwellMs: 12000,
         pinned: null,
     },

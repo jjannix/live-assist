@@ -377,6 +377,73 @@
             background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.50) 100%);
         }
 
+        /* ── Slide: nebel (blurred colour fields, pure CSS) ── */
+        /* Soft, drifting fog of blurred colour blobs — no canvas, no rAF.
+           Animations are deliberately slow (24–42 s) so the motion is
+           barely perceptible. A perfect quiet background layer to run
+           behind sponsor / weather content if needed. */
+        .slide.nebel-slide {
+            padding: 0; overflow: hidden;
+            background: #060812;
+        }
+        .nebel-blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.35;
+            will-change: transform;
+        }
+        .nebel-blob:nth-child(1) {
+            width: 65vmin; height: 55vmin;
+            background: #3d2c6a;
+            top: -8%; left: -10%;
+            animation: nebel-drift-1 28s ease-in-out infinite alternate;
+        }
+        .nebel-blob:nth-child(2) {
+            width: 70vmin; height: 60vmin;
+            background: #23555c;
+            bottom: -5%; right: -12%;
+            animation: nebel-drift-2 34s ease-in-out infinite alternate;
+        }
+        .nebel-blob:nth-child(3) {
+            width: 48vmin; height: 62vmin;
+            background: #6a3c4a;
+            top: 30%; left: 45%;
+            animation: nebel-drift-3 24s ease-in-out infinite alternate;
+        }
+        .nebel-blob:nth-child(4) {
+            width: 40vmin; height: 45vmin;
+            background: #2e4a5c;
+            bottom: 18%; left: 5%;
+            animation: nebel-drift-4 42s ease-in-out infinite alternate;
+        }
+        .nebel-blob:nth-child(5) {
+            width: 52vmin; height: 38vmin;
+            background: #4a354a;
+            top: -2%; right: 5%;
+            animation: nebel-drift-5 30s ease-in-out infinite alternate;
+        }
+        @keyframes nebel-drift-1 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(12%, 8%) scale(1.12); }
+        }
+        @keyframes nebel-drift-2 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-10%, -6%) scale(1.08); }
+        }
+        @keyframes nebel-drift-3 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-6%, 10%) scale(1.15); }
+        }
+        @keyframes nebel-drift-4 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(8%, -8%) scale(1.10); }
+        }
+        @keyframes nebel-drift-5 {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-6%, 8%) scale(1.08); }
+        }
+
     </style>
 </head>
 <body>
@@ -499,6 +566,15 @@
                 <canvas class="mercury-canvas" id="mercuryCanvas"></canvas>
                 <div class="mercury-sheen" aria-hidden="true"></div>
                 <div class="mercury-vignette" aria-hidden="true"></div>
+            </section>
+
+            <!-- 10. Nebel (blurred colour fields, pure CSS) -->
+            <section class="slide nebel-slide" data-slide="nebel">
+                <div class="nebel-blob" aria-hidden="true"></div>
+                <div class="nebel-blob" aria-hidden="true"></div>
+                <div class="nebel-blob" aria-hidden="true"></div>
+                <div class="nebel-blob" aria-hidden="true"></div>
+                <div class="nebel-blob" aria-hidden="true"></div>
             </section>
 
         </div>
@@ -762,6 +838,7 @@
             if (name === 'weather') startWeatherCanvas(state.weather && state.weather.scene);
             else stopWeatherCanvas();
             if (name === 'mercury') startMercury(); else stopMercury();
+            if (name === 'nebel') startNebel(); else stopNebel();
         }
 
         // ── Weather (atmospheric slide) ────────────────────────────
@@ -1012,6 +1089,12 @@
             mRaf = requestAnimationFrame(draw);
         }
         function stopMercury() { if (mRaf) { cancelAnimationFrame(mRaf); mRaf = null; } }
+
+        // ── Nebel (blurred colour fields, pure CSS) ───────────────
+        // No rAF, no canvas — all animation lives in CSS keyframes.
+        // The stop/start stubs exist for lifecycle consistency.
+        function startNebel() {}
+        function stopNebel() {}
 
         // ── Flowfield (generative particle art) ───────────────────
         let fParticles = null, fRaf = null;
