@@ -57,6 +57,13 @@ const SCHEMA = [
       help: 'Capture width. Smaller is faster to encode and cheaper over WiFi; height keeps the source aspect ratio.' },
     { key: 'PREVIEW_QUALITY', label: 'Preview JPEG quality (1–100)', type: 'number', default: '70',
       help: 'Compression quality of the captured frame. 60–80 is a good range for a confidence check.' },
+
+    { section: 'Weather', key: 'STADIUM_NAME', label: 'Location name', type: 'text', default: '',
+      help: 'Label shown on the weather slide (city or ground name). Optional.' },
+    { key: 'STADIUM_LAT', label: 'Latitude', type: 'text', default: '52.517',
+      help: 'Decimal degrees. Used by the weather slide to fetch local conditions.' },
+    { key: 'STADIUM_LON', label: 'Longitude', type: 'text', default: '13.400',
+      help: 'Decimal degrees.' },
 ];
 
 /** Load .env once at boot. override:true makes the file authoritative. */

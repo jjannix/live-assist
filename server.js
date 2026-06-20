@@ -8,6 +8,7 @@ const { default: OBSWebSocket } = require('obs-websocket-js');
 const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
 const config = require('./config');
 const breakState = require('./break-state');
+const weather = require('./weather-state');
 
 // .env is the single source of truth. Loaded once at boot with
 // override:true so a hand-edited (or in-app-edited) file always wins
@@ -353,6 +354,19 @@ app.use(express.static('public'));
 // break.html (beamer) and break-control.html (operator) are both views
 // over the same state. One subscription fans updates to all sockets.
 breakState.subscribe(state => io.emit('breakState', state));
+
+// ── Weather poller (Open-Meteo) ───────────────────────────────────
+// Feeds the beamer's "weather" slide. Restarted by reloadRuntime() so
+// editing STADIUM_LAT/LON in Settings takes effect without a restart.
+function startWeather() {
+    weather.restart({
+        lat: process.env.STADIUM_LAT,
+        lon: process.env.STADIUM_LON,
+        location: process.env.STADIUM_NAME || '',
+        logger: line => console.log('[weather] ' + line),
+    });
+}
+startWeather();
 
 io.on('connection', async socket => {
     console.log('Client connected');

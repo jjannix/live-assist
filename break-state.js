@@ -42,11 +42,10 @@ const DEFAULTS = Object.freeze({
     // Demo slides (particles/equalizer/stats/ticker) ship OFF so they
     // don't appear unless the operator opts in.
     rotation: {
-        // The seven slides you've curated as the core deck. The other
-        // 13 are opt-in from the Slides (rotation) panel in the
-        // operator page.
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'brand', 'flowfield'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, brand: true, flowfield: true },
+        // The slides you've curated as the core deck. The others are
+        // opt-in from the Slides (rotation) panel in the operator page.
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true },
         dwellMs: 12000,
         pinned: null,
     },
@@ -62,6 +61,27 @@ const DEFAULTS = Object.freeze({
         dwellMs: 8000,     // per-sponsor dwell when multiple are configured
     },
     // (No additional state — only the 7 curated slides remain.)
+    // Live local weather for the "weather" slide. Populated by the
+    // weather-state poller (Open-Meteo, no API key). All fields null
+    // until the first successful fetch; the slide degrades to a
+    // loading / "—" state when empty.
+    weather: {
+        temp: null,           // current temperature, °C
+        feelsLike: null,      // apparent temperature, °C
+        code: null,           // WMO weather code
+        label: '',            // "Klar", "Regen", …
+        wind: null,           // km/h
+        windDir: '',          // 16-point compass, German (O = Ost)
+        humidity: null,       // %
+        uv: null,
+        high: null,           // today's max, °C
+        low: null,            // today's min, °C
+        hourly: [],           // [{ time, temp, code }] next ~6 h
+        scene: '',            // 'clear-day' | 'rain' | … (drives the bg)
+        isDay: true,
+        location: '',         // free-text label (city / ground)
+        updatedAt: null,      // epoch ms of last successful fetch
+    },
 });
 
 let state = load();
@@ -317,6 +337,13 @@ function setAd(patch) {
     updateSponsor(0, patch);
 }
 
+/** Merge a weather snapshot from the poller into state.weather. */
+function setWeather(patch) {
+    if (!patch || typeof patch !== 'object') return;
+    state.weather = Object.assign({}, state.weather, patch);
+    commit();
+}
+
 // ── pub/sub ───────────────────────────────────────────────────────
 
 /** Subscribe to state changes. Returns an unsubscribe fn. */
@@ -330,6 +357,7 @@ module.exports = {
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
     setRotation, setAd,
     addSponsor, updateSponsor, removeSponsor, setSponsorLogo, setAdDwell,
+    setWeather,
     subscribe,
     DEFAULTS,
 };
