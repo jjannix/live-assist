@@ -378,10 +378,11 @@
         }
 
         /* ── Slide: nebel (drifting colour fields, pure CSS) ── */
-        /* Soft fog of gradient blobs — no filter:blur (which can
-           suppress CSS animation compositing in some browsers), no
-           canvas, no rAF. Radial gradients give the same diffuse
-           look without the rendering tax. */
+        /* Oversized radial-gradient blobs (150–200 vmin) so the
+           edge cutoff is always off-screen. A light blur (20 px)
+           softens the gradient without smearing positional changes.
+           Large translations (40–60 %) make the drift clearly
+           visible even with the blur. */
         .slide.nebel-slide {
             padding: 0; overflow: hidden;
             background: #080a14;
@@ -389,57 +390,59 @@
         .nebel-blob {
             position: absolute;
             border-radius: 50%;
+            filter: blur(20px);
             will-change: transform;
+            opacity: 0.5;
         }
         .nebel-blob:nth-child(1) {
-            width: 64vmin; height: 56vmin;
-            background: radial-gradient(circle at 40% 45%, rgba(123,94,168,0.55) 0%, rgba(123,94,168,0) 68%);
-            top: 4%; left: -18%;
-            animation: nebel-drift-1 7s ease-in-out infinite alternate;
+            width: 180vmin; height: 160vmin;
+            background: radial-gradient(circle at 45% 50%, rgba(123,94,168,0.55) 0%, rgba(123,94,168,0) 65%);
+            top: -15%; left: -50%;
+            animation: nebel-drift-1 10s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(2) {
-            width: 70vmin; height: 60vmin;
-            background: radial-gradient(circle at 60% 50%, rgba(54,128,140,0.50) 0%, rgba(54,128,140,0) 65%);
-            bottom: -2%; right: -14%;
-            animation: nebel-drift-2 9s ease-in-out infinite alternate;
+            width: 200vmin; height: 170vmin;
+            background: radial-gradient(circle at 55% 45%, rgba(54,128,140,0.50) 0%, rgba(54,128,140,0) 65%);
+            bottom: -20%; right: -60%;
+            animation: nebel-drift-2 12s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(3) {
-            width: 52vmin; height: 64vmin;
-            background: radial-gradient(circle at 50% 40%, rgba(168,88,112,0.50) 0%, rgba(168,88,112,0) 70%);
-            top: 22%; left: 42%;
-            animation: nebel-drift-3 6s ease-in-out infinite alternate;
+            width: 150vmin; height: 180vmin;
+            background: radial-gradient(circle at 50% 40%, rgba(168,88,112,0.45) 0%, rgba(168,88,112,0) 65%);
+            top: 15%; left: 30%;
+            animation: nebel-drift-3 9s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(4) {
-            width: 56vmin; height: 48vmin;
-            background: radial-gradient(circle at 35% 55%, rgba(74,122,148,0.50) 0%, rgba(74,122,148,0) 66%);
-            bottom: 12%; left: -8%;
-            animation: nebel-drift-4 11s ease-in-out infinite alternate;
+            width: 170vmin; height: 150vmin;
+            background: radial-gradient(circle at 40% 55%, rgba(74,122,148,0.45) 0%, rgba(74,122,148,0) 65%);
+            bottom: 5%; left: -30%;
+            animation: nebel-drift-4 14s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(5) {
-            width: 54vmin; height: 44vmin;
-            background: radial-gradient(circle at 55% 45%, rgba(138,90,122,0.50) 0%, rgba(138,90,122,0) 68%);
-            top: -2%; right: 6%;
-            animation: nebel-drift-5 8s ease-in-out infinite alternate;
+            width: 160vmin; height: 140vmin;
+            background: radial-gradient(circle at 55% 50%, rgba(138,90,122,0.45) 0%, rgba(138,90,122,0) 65%);
+            top: -5%; right: -40%;
+            animation: nebel-drift-5 11s ease-in-out infinite alternate;
         }
         @keyframes nebel-drift-1 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(50%, 25%) scale(1.3); }
+            100% { transform: translate(35%, 20%) scale(1.1); }
         }
         @keyframes nebel-drift-2 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-45%, -20%) scale(1.25); }
+            100% { transform: translate(-30%, -15%) scale(1.08); }
         }
         @keyframes nebel-drift-3 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-25%, 38%) scale(1.35); }
+            100% { transform: translate(-20%, 25%) scale(1.12); }
         }
         @keyframes nebel-drift-4 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(38%, -25%) scale(1.25); }
+            100% { transform: translate(28%, -18%) scale(1.1); }
         }
         @keyframes nebel-drift-5 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-30%, 32%) scale(1.25); }
+            100% { transform: translate(-22%, 20%) scale(1.08); }
         }
         /* Text overlay sits above the blobs, centred. */
         .nebel-text {
