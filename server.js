@@ -134,6 +134,54 @@ function broadcastChannel(channelId) {
     }).catch(() => { /* ignore — backend is offline */ });
 }
 
+/**
+ * Read the gain to use for a save/restore snapshot. Prefers the gain
+ * the backend last COMMANDED (always accurate) over a fresh read.
+ *
+ * Why: Voicemeeter's reported gain lags behind writes — its parameter
+ * cache refreshes on Voicemeeter's own schedule — so snapshotting a
+ * channel right after fading it can capture the OLD value. That
+ * corrupted the Game/Break level memory: TV faded to silence on
+ * Break, then on the next Game On the snapshot read the stale -60
+ * instead of the real -25.3, so TV "never went back up". The
+ * commanded-gain cache reflects exactly what we sent, so the snapshot
+ * is always correct.
+ *
+ * Falls back to a real read on the very first run, before anything
+ * has been commanded (e.g. right after boot, levels set in VM's own
+ * UI before the app touched them).
+ */
+async function snapshotGain(channelId) {
+    const commanded = (typeof audioBackend.getLastCommandedGain === 'function')
+        ? audioBackend.getLastCommandedGain(channelId)
+        : undefined;
+    if (typeof commanded === 'number' && Number.isFinite(commanded)) return commanded;
+    try {
+        const s = await audioBackend.getChannelState(channelId);
+        return s.gainDb;
+    } catch (_) {
+        return -60;
+    }
+}
+
+/**
+ * Build an onProgress callback for applyPreset that streams fader
+ * positions to every client during the ramp, so the on-screen faders
+ * glide with the audio instead of snapping to the target at the end
+ * (which reads as a "jump" even when the audio itself ramps cleanly).
+ * Emits at most every ~50 ms to avoid flooding slow links.
+ */
+function makeFadeReporter() {
+    let lastEmit = 0;
+    return gains => {
+        const now = Date.now();
+        if (now - lastEmit < 50) return;
+        lastEmit = now;
+        if (typeof gains[3] === 'number') io.emit('faderState', { stripIndex: 3, gain: gains[3] });
+        if (typeof gains[4] === 'number') io.emit('faderState', { stripIndex: 4, gain: gains[4] });
+    };
+}
+
 async function selectAndInitAudioBackend() {
     const mode = (process.env.AUDIO_BACKEND || 'auto').toLowerCase().trim();
     try {
@@ -163,7 +211,25 @@ async function selectAndInitAudioBackend() {
 }
 
 // Server-side profile storage (keyed by name; value is { 3: gainDb, 4: gainDb })
-const profiles = {};
+// Persisted to disk so profiles survive restarts (same pattern as break-state.json).
+const PROFILES_FILE = path.join(__dirname, 'audio-profiles.json');
+
+function loadProfilesFromDisk() {
+    try {
+        const raw = fs.readFileSync(PROFILES_FILE, 'utf8');
+        return JSON.parse(raw);
+    } catch (_) {
+        return {};
+    }
+}
+
+function persistProfiles() {
+    try {
+        fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles, null, 2), 'utf8');
+    } catch (_) { /* best-effort */ }
+}
+
+const profiles = loadProfilesFromDisk();
 
 // Saved audio levels per mode. Updated every time you leave a mode.
 // null = never visited, use defaults.
@@ -264,6 +330,9 @@ function reloadRuntime() {
     Promise.resolve()
         .then(() => previous.shutdown()).catch(() => {})
         .then(() => selectAndInitAudioBackend());
+
+    // Weather — restart the poller with (possibly) new stadium coords.
+    startWeather();
 }
 
 function lanUrls() {
@@ -412,6 +481,7 @@ io.on('connection', async socket => {
                 audioBackend.getChannelState(4),
             ]);
             profiles[name] = { 3: s3.gainDb, 4: s4.gainDb };
+            persistProfiles();
             socket.emit('profileSaved', { name, gains: profiles[name] });
             io.emit('terminalOutput', 'Saved profile: ' + name);
         } catch (err) {
@@ -422,7 +492,10 @@ io.on('connection', async socket => {
     socket.on('loadProfile', async data => {
         if (!audioBackend.isConnected()) return;
         const p = profiles[data.name];
-        if (!p) return;
+        if (!p) {
+            socket.emit('terminalOutput', 'No profile "' + data.name + '" saved yet — use + Save first');
+            return;
+        }
         try {
             await audioBackend.setMultiChannelGain({ 3: p[3], 4: p[4] });
             io.emit('profileLoaded', { name: data.name, gains: p });
@@ -481,13 +554,13 @@ io.on('connection', async socket => {
 
     socket.on('GameAction', async () => {
         try {
-            // Save current levels as Break's state before leaving it
+            // Save current levels as Break's state before leaving it.
+            // Uses snapshotGain (last COMMANDED gain) — a fresh Voicemeeter
+            // read can lag behind our writes and capture the wrong level,
+            // which is what broke the level memory (TV "never went back up").
             if (audioBackend.isConnected()) {
-                const [tvNow, spNow] = await Promise.all([
-                    audioBackend.getChannelState(3),
-                    audioBackend.getChannelState(4),
-                ]);
-                savedBreakLevels = { 3: tvNow.gainDb, 4: spNow.gainDb };
+                const [tvNow, spNow] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
+                savedBreakLevels = { 3: tvNow, 4: spNow };
             }
 
             const tvTarget = savedGameLevels ? savedGameLevels[3] : GAME_DEFAULT.tv;
@@ -499,16 +572,14 @@ io.on('connection', async socket => {
 
             if (audioBackend.isConnected()) {
                 io.emit('terminalOutput', 'Fading audio.');
-                const [tvStart, spStart] = await Promise.all([
-                    audioBackend.getChannelState(3),
-                    audioBackend.getChannelState(4),
-                ]);
+                const [tvStart, spStart] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
                 await audioBackend.applyPreset({
                     channels: [
-                        { id: 3, fromDb: tvStart.gainDb, toDb: tvTarget },
-                        { id: 4, fromDb: spStart.gainDb, toDb: spTarget },
+                        { id: 3, fromDb: tvStart, toDb: tvTarget },
+                        { id: 4, fromDb: spStart, toDb: spTarget },
                     ],
                     durationMs: AUDIO_FADE_DURATION_MS,
+                    onProgress: makeFadeReporter(),
                 });
                 io.emit('faderState', { stripIndex: 3, gain: tvTarget });
                 io.emit('faderState', { stripIndex: 4, gain: spTarget });
@@ -527,15 +598,13 @@ io.on('connection', async socket => {
 
     socket.on('PauseAction', async () => {
         try {
-            // Snapshot current levels BEFORE fading, so GameAction
-            // can restore them exactly.
             if (audioBackend.isConnected()) {
-                const [tvNow, spNow] = await Promise.all([
-                    audioBackend.getChannelState(3),
-                    audioBackend.getChannelState(4),
-                ]);
+                // Snapshot current levels BEFORE fading, so GameAction
+                // can restore them exactly. snapshotGain (last commanded
+                // gain) avoids the stale-read trap that broke level memory.
+                const [tvNow, spNow] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
                 // Save current levels as Game's state before leaving it
-                savedGameLevels = { 3: tvNow.gainDb, 4: spNow.gainDb };
+                savedGameLevels = { 3: tvNow, 4: spNow };
 
                 // Switch OBS scene first for instant visual feedback
                 await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
@@ -546,10 +615,11 @@ io.on('connection', async socket => {
 
                 await audioBackend.applyPreset({
                     channels: [
-                        { id: 3, fromDb: tvNow.gainDb, toDb: tvTarget },
-                        { id: 4, fromDb: spNow.gainDb, toDb: spTarget },
+                        { id: 3, fromDb: tvNow, toDb: tvTarget },
+                        { id: 4, fromDb: spNow, toDb: spTarget },
                     ],
                     durationMs: AUDIO_FADE_DURATION_MS,
+                    onProgress: makeFadeReporter(),
                 });
                 io.emit('faderState', { stripIndex: 3, gain: tvTarget });
                 io.emit('faderState', { stripIndex: 4, gain: spTarget });
@@ -564,6 +634,40 @@ io.on('connection', async socket => {
             console.error('Automated action (PauseAction) failed:', err);
             io.emit('terminalOutput', 'Automated action failed: ' + err.message);
             io.emit('actionFailed');
+        }
+    });
+
+    // ── Audio-only presets (the Game / Break chips in Profiles) ──
+    // Same audio fade as the big action buttons (uses the same level
+    // memory: savedGameLevels / savedBreakLevels), but WITHOUT switching
+    // the OBS scene. The level memory is NOT overwritten — these are
+    // "quick audio" helpers, not mode changes.
+    socket.on('audioPreset', async data => {
+        if (!audioBackend.isConnected()) return;
+        const mode = data.mode;
+        if (mode !== 'game' && mode !== 'break') return;
+        try {
+            const [tvStart, spStart] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
+            const tvTarget = mode === 'game'
+                ? (savedGameLevels ? savedGameLevels[3] : GAME_DEFAULT.tv)
+                : BREAK_PRESET.tv;
+            const spTarget = mode === 'game'
+                ? GAME_DEFAULT.sp
+                : (savedBreakLevels ? savedBreakLevels[4] : BREAK_PRESET.sp);
+
+            await audioBackend.applyPreset({
+                channels: [
+                    { id: 3, fromDb: tvStart, toDb: tvTarget },
+                    { id: 4, fromDb: spStart, toDb: spTarget },
+                ],
+                durationMs: AUDIO_FADE_DURATION_MS,
+                onProgress: makeFadeReporter(),
+            });
+            io.emit('faderState', { stripIndex: 3, gain: tvTarget });
+            io.emit('faderState', { stripIndex: 4, gain: spTarget });
+            io.emit('terminalOutput', 'Audio preset ' + mode + ': TV ' + tvTarget.toFixed(1) + ' dB, Spotify ' + spTarget.toFixed(1) + ' dB');
+        } catch (err) {
+            console.error('audioPreset failed:', err);
         }
     });
 

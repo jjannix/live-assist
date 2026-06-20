@@ -47,6 +47,10 @@ class NativeBackend extends AudioBackend {
         // racy and we want the UI to reflect exactly what we last wrote.
         this._muteState = {};
         for (const id of this._channelIds) this._muteState[id] = false;
+
+        // Last gain we commanded per channel. Save/restore snapshots
+        // trust this over a fresh (potentially averaged/stale) read.
+        this._commandedGain = {};
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────
@@ -128,10 +132,19 @@ class NativeBackend extends AudioBackend {
         for (const s of sessions) {
             try { s.volume = scalar; } catch (e) { /* expired mid-call */ }
         }
+        this._commandedGain[channelId] = gainDb;
         if (sessions.length === 0 && this._log) {
             // Quiet hint — apps that aren't running shouldn't be loud
             this._log('setChannelGain(' + channelId + '): no active app sessions for this channel');
         }
+    }
+
+    /**
+     * Last gain we commanded for a channel (or undefined). Preferred
+     * over a fresh read for save/restore snapshots.
+     */
+    getLastCommandedGain(channelId) {
+        return this._commandedGain[channelId];
     }
 
     async toggleMute(channelId) {
@@ -159,7 +172,7 @@ class NativeBackend extends AudioBackend {
      * keeping the total fade close to the requested `durationMs` even
      * with 4–5 active sessions per channel.
      */
-    async applyPreset({ channels, durationMs }) {
+    async applyPreset({ channels, durationMs, onProgress }) {
         const fadeSteps = 30;
         const stepMs = Math.max(1, Math.round(durationMs / fadeSteps));
         // Cache the session list per channel so we don't refilter on
@@ -179,14 +192,17 @@ class NativeBackend extends AudioBackend {
         const fadeStart = Date.now();
         for (let i = 0; i <= fadeSteps; i++) {
             const p = i / fadeSteps;
+            const gains = {};
             // Linear dB ramp
             for (const t of targets) {
                 const gainDb = t.fromDb * (1 - p) + t.toDb * p;
+                gains[t.id] = gainDb;
                 const scalar = dbToScalar(gainDb);
                 for (const s of t.sessions) {
                     try { s.volume = scalar; } catch (e) { /* expired mid-call */ }
                 }
             }
+            if (onProgress) { try { onProgress(gains); } catch (_) { /* caller's problem */ } }
             // Sleep until the *next* step should fire, measured from the
             // start of the fade. This is more accurate than per-step
             // setTimeout, which on Windows has an effective granularity
@@ -198,6 +214,8 @@ class NativeBackend extends AudioBackend {
                 await new Promise(r => setImmediate(r));
             }
         }
+        // Lock in the commanded-gain cache for every channel we ramped.
+        for (const t of targets) this._commandedGain[t.id] = t.toDb;
     }
 
     syncInitialState() {
@@ -208,7 +226,9 @@ class NativeBackend extends AudioBackend {
             // Average volume of currently-active sessions
             let sum = 0;
             for (const sess of s) sum += (typeof sess.volume === 'number' ? sess.volume : 0);
-            fader[id] = scalarToDb(sum / s.length);
+            const db = scalarToDb(sum / s.length);
+            fader[id] = db;
+            this._commandedGain[id] = db;   // seed the cache from reality
             mute[id] = this._muteState[id];
         }
         return { mute, fader };
