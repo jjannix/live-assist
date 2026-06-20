@@ -379,9 +379,9 @@
 
         /* ── Slide: nebel (blurred colour fields, pure CSS) ── */
         /* Soft, drifting fog of blurred colour blobs — no canvas, no rAF.
-           Animations are deliberately slow (24–42 s) so the motion is
-           barely perceptible. A perfect quiet background layer to run
-           behind sponsor / weather content if needed. */
+           Drift animations run at 12–20 s so the motion is perceptible
+           but calm. A perfect quiet background layer to run behind
+           sponsor / weather content if needed. */
         .slide.nebel-slide {
             padding: 0; overflow: hidden;
             background: #060812;
@@ -397,51 +397,73 @@
             width: 65vmin; height: 55vmin;
             background: #3d2c6a;
             top: -8%; left: -10%;
-            animation: nebel-drift-1 28s ease-in-out infinite alternate;
+            animation: nebel-drift-1 14s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(2) {
             width: 70vmin; height: 60vmin;
             background: #23555c;
             bottom: -5%; right: -12%;
-            animation: nebel-drift-2 34s ease-in-out infinite alternate;
+            animation: nebel-drift-2 18s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(3) {
             width: 48vmin; height: 62vmin;
             background: #6a3c4a;
             top: 30%; left: 45%;
-            animation: nebel-drift-3 24s ease-in-out infinite alternate;
+            animation: nebel-drift-3 12s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(4) {
             width: 40vmin; height: 45vmin;
             background: #2e4a5c;
             bottom: 18%; left: 5%;
-            animation: nebel-drift-4 42s ease-in-out infinite alternate;
+            animation: nebel-drift-4 20s ease-in-out infinite alternate;
         }
         .nebel-blob:nth-child(5) {
             width: 52vmin; height: 38vmin;
             background: #4a354a;
             top: -2%; right: 5%;
-            animation: nebel-drift-5 30s ease-in-out infinite alternate;
+            animation: nebel-drift-5 16s ease-in-out infinite alternate;
         }
         @keyframes nebel-drift-1 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(12%, 8%) scale(1.12); }
+            100% { transform: translate(22%, 18%) scale(1.2); }
         }
         @keyframes nebel-drift-2 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-10%, -6%) scale(1.08); }
+            100% { transform: translate(-20%, -14%) scale(1.15); }
         }
         @keyframes nebel-drift-3 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-6%, 10%) scale(1.15); }
+            100% { transform: translate(-14%, 20%) scale(1.25); }
         }
         @keyframes nebel-drift-4 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(8%, -8%) scale(1.10); }
+            100% { transform: translate(18%, -16%) scale(1.18); }
         }
         @keyframes nebel-drift-5 {
             0%   { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(-6%, 8%) scale(1.08); }
+            100% { transform: translate(-12%, 18%) scale(1.15); }
+        }
+        /* Text overlay sits above the blobs, centred. */
+        .nebel-text {
+            position: absolute; inset: 0; z-index: 5;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 60px; gap: 10px;
+            color: rgba(255,255,255,0.88);
+            text-align: center;
+            pointer-events: none;
+        }
+        .nebel-text .nt-line1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(40px, 5vw, 88px);
+            font-weight: 600; letter-spacing: -0.02em;
+        }
+        .nebel-text .nt-line2 {
+            font-size: clamp(18px, 2vw, 34px);
+            font-weight: 400;
+            color: rgba(255,255,255,0.55);
+            font-style: italic;
+            margin-top: 8px;
         }
 
     </style>
@@ -575,6 +597,10 @@
                 <div class="nebel-blob" aria-hidden="true"></div>
                 <div class="nebel-blob" aria-hidden="true"></div>
                 <div class="nebel-blob" aria-hidden="true"></div>
+                <div class="nebel-text">
+                    <div class="nt-line1">Pause</div>
+                    <div class="nt-line2">gleich weiter</div>
+                </div>
             </section>
 
         </div>
