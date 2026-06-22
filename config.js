@@ -60,9 +60,9 @@ const SCHEMA = [
 
     { section: 'Weather', key: 'STADIUM_NAME', label: 'Location name', type: 'text', default: '',
       help: 'Label shown on the weather slide (city or ground name). Optional.' },
-    { key: 'STADIUM_LAT', label: 'Latitude', type: 'text', default: '52.517',
+    { key: 'STADIUM_LAT', label: 'Latitude', type: 'text', default: '49.318',
       help: 'Decimal degrees. Used by the weather slide to fetch local conditions.' },
-    { key: 'STADIUM_LON', label: 'Longitude', type: 'text', default: '13.400',
+    { key: 'STADIUM_LON', label: 'Longitude', type: 'text', default: '7.344',
       help: 'Decimal degrees.' },
 ];
 
