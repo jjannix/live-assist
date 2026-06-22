@@ -68,19 +68,7 @@ body.dim {
     border: 1px solid var(--border);
 }
 
-.topbar-link {
-    width: 32px; height: 32px;
-    border-radius: 16px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.15s;
-}
-.topbar-link:active { transform: scale(0.9); background: var(--card-up); }
-.topbar-link svg { width: 16px; height: 16px; }
-.topbar-nav { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-.topbar-nav + .status-pill { margin-left: 8px; }
+
 
 .conn-dot {
     width: 6px; height: 6px; border-radius: 50%;
@@ -281,6 +269,100 @@ body.dim[data-mode="break"] .hero-ring { border-color: rgba(120,53,15,0.4); box-
     color: var(--text);
 }
 
+/* ═══ Hero live-peek (on-demand frame, same construction as the faders card) ═══ */
+/* Idle ring + peek card swap via data-preview on .hero-space. Plain
+   document flow — no grid stacking, so the card can never render
+   'behind' its siblings. The incoming side fades in. */
+.hero-idle {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 16px;
+}
+.hero-space[data-preview="idle"]    .hero-idle { display: flex; }
+.hero-space[data-preview="idle"]    .hero-card { display: none; }
+.hero-space[data-preview="loading"] .hero-idle,
+.hero-space[data-preview="live"]    .hero-idle,
+.hero-space[data-preview="error"]   .hero-idle { display: none; }
+.hero-space[data-preview="loading"] .hero-card,
+.hero-space[data-preview="live"]    .hero-card,
+.hero-space[data-preview="error"]   .hero-card {
+    display: flex; animation: hero-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes hero-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
+
+.hero-card {
+    flex-direction: column; gap: 10px;
+    width: min(74vw, 300px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 8px;
+}
+.hero-thumb {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--card-up);
+}
+.hero-thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+    cursor: pointer;
+    transition: opacity 0.25s;
+}
+.hero-space[data-preview="loading"] .hero-thumb img,
+.hero-space[data-preview="error"]   .hero-thumb img { opacity: 0; }
+
+/* Capturing shimmer, tinted with the app's own card tones */
+.hero-skeleton {
+    position: absolute; inset: 0;
+    background: linear-gradient(110deg, var(--card-up) 25%, var(--card) 50%, var(--card-up) 75%);
+    background-size: 220% 100%;
+    animation: hero-shimmer 1.3s linear infinite;
+    opacity: 0; transition: opacity 0.2s;
+}
+.hero-space[data-preview="loading"] .hero-skeleton { opacity: 1; }
+@keyframes hero-shimmer {
+    0%   { background-position: 220% 0; }
+    100% { background-position: -220% 0; }
+}
+
+/* Error surface inside the thumb well */
+.hero-err {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 14px;
+    font-size: 11px; font-weight: 600; color: var(--text-2);
+}
+.hero-space[data-preview="error"] .hero-err { display: flex; }
+
+/* Meta row: panel-style label + tabular timestamp + age + close */
+.hero-meta {
+    display: flex; align-items: center; gap: 8px;
+    padding: 2px 6px 4px;
+}
+.hero-meta-lbl  { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: var(--text-3); }
+.hero-meta-ts   { font-size: 11px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; margin-left: auto; }
+.hero-meta-age  { font-size: 11px; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums; min-width: 42px; text-align: right; }
+.hero-meta-age.stale { color: var(--amber); }
+.hero-meta-close {
+    width: 22px; height: 22px; border-radius: 11px;
+    border: 1px solid var(--border); background: var(--card-up); color: var(--text-2);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+}
+.hero-meta-close svg { width: 12px; height: 12px; }
+.hero-meta-close:active { transform: scale(0.88); background: var(--border-hl); color: var(--text); }
+
+/* Peek trigger reuses .util-btn; eye ⇄ spinner while capturing, and
+   it lights up like .chip.on while a frame is on screen. */
+.util-btn .ic-spin { display: none; }
+.util-btn[data-state="loading"] .ic-eye  { display: none; }
+.util-btn[data-state="loading"] .ic-spin { display: block; animation: hero-spin 0.8s linear infinite; }
+.util-btn.active { color: var(--text); background: var(--card-up); border-color: var(--border-hl); }
+@keyframes hero-spin { to { transform: rotate(360deg); } }
+
 /* ═══ Quick Panels (Scenes & Presets) ═══ */
 .quick-panels {
     display: flex; flex-direction: column; gap: 16px;
@@ -331,6 +413,7 @@ body.dim[data-mode="break"] .hero-ring { border-color: rgba(120,53,15,0.4); box-
 .dock-utils {
     display: flex; align-items: center; justify-content: space-between;
 }
+.dock-util-group { display: flex; gap: 8px; }
 .util-btn {
     width: 40px; height: 40px;
     border-radius: 20px;
@@ -510,3 +593,28 @@ body.dim[data-mode="break"] .action-btn.break svg { stroke: #f59e0b; }
 .kv-k { font-size: 12px; font-weight: 500; color: var(--text-2); }
 .kv-v { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; font-family: 'SF Mono', Menlo, Consolas, monospace; }
 .kv-v.muted { color: var(--text-3); }
+
+/* ── Base form inputs (shared by settings / break-control / etc.) ── */
+input[type="text"],
+input[type="number"] {
+    width: 100%;
+    background: var(--card-up);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.15s;
+}
+input[type="text"]:focus,
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--border-hl);
+}
+input[type="text"]::placeholder,
+input[type="number"]::placeholder {
+    color: var(--text-3);
+}

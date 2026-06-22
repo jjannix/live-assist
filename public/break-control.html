@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>Break · Live Assist</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Page-level overrides — everything else comes from style.css */
+        body { overflow-y: auto; }
+        /* .main inherits display:flex from style.css (built for the
+           fixed-height main controller). Break-control is a scrolling
+           page — override to block so sections use their natural height. */
+        .main { display: block; padding-bottom: 40px; }
+
+        /* ── Big live counter (unique component, no style.css equivalent) ── */
+        .bc-clock {
+            text-align: center; padding: 12px 0 4px;
+        }
+        .bc-clock-num {
+            font-size: 56px; font-weight: 800; letter-spacing: -1px;
+            font-variant-numeric: tabular-nums; color: var(--text);
+            line-height: 1;
+        }
+        .bc-clock-num.done { color: var(--amber); }
+        .bc-clock-cap {
+            font-size: 11px; font-weight: 700; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--text-3);
+            margin-top: 2px;
+        }
+
+        /* ── Score cards (two-column, large numbers) ── */
+        .sc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .sc-card {
+            background: var(--card-up);
+            border: 1px solid var(--border);
+            border-radius: 16px; padding: 14px;
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+        }
+        .sc-card input {
+            text-align: center; font-size: 13px; font-weight: 600;
+            background: transparent; border: none; border-bottom: 1px solid var(--border);
+            border-radius: 0; padding: 4px 0; margin-bottom: 4px;
+        }
+        .sc-card input:focus { border-bottom-color: var(--border-hl); }
+        .sc-val {
+            font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums;
+            color: var(--text); line-height: 1;
+        }
+        .sc-btns { display: flex; gap: 8px; width: 100%; }
+        .sc-btns .chip { flex: 1; padding: 12px 0; font-size: 18px; font-weight: 700; }
+
+        /* ── Slide toggles ── */
+        .sl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .sl-toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px; border-radius: 12px;
+            background: var(--card-up); border: 1px solid var(--border);
+            font-size: 13px; font-weight: 600; color: var(--text-2);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .sl-toggle.on { color: var(--text); border-color: var(--border-hl); }
+        .sl-toggle .pin {
+            width: 22px; height: 22px; border-radius: 11px;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text-3); display: flex; align-items: center; justify-content: center;
+            font-size: 11px; cursor: pointer; margin-left: 8px;
+            transition: all 0.15s;
+        }
+        .sl-toggle .pin.on { background: var(--accent); border-color: var(--accent); color: #000; }
+
+        /* ── Sponsor row editor ── */
+        .sr-row {
+            background: var(--card-up);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .sr-head { display: flex; align-items: center; gap: 10px; }
+        .sr-num {
+            width: 26px; height: 26px; border-radius: 13px;
+            background: var(--accent); color: #000;
+            font-weight: 800; font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .sr-right { flex: 1; display: flex; justify-content: flex-end; }
+        .sr-right .chip { padding: 8px 12px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <header class="topbar">
+        <button class="back-btn" onclick="location.href='/'" aria-label="Back to controller">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="logo">BREAK</span>
+        <div class="status-pill">
+            <span class="conn-dot" id="conn" data-s="wait"></span>
+            <span class="status-txt" id="connTxt">connecting</span>
+        </div>
+    </header>
+
+    <main class="main">
+
+        <!-- Timer -->
+        <div class="section">
+            <div class="section-title">Timer</div>
+            <div class="bc-clock">
+                <div class="bc-clock-num" id="liveClock">15:00</div>
+                <div class="bc-clock-cap" id="liveCap">bis Anpfiff</div>
+            </div>
+            <div class="panel-grid" style="grid-template-columns:2fr 2fr 1.5fr">
+                <button class="chip" id="tStart">▶ Start</button>
+                <button class="chip" id="tPause">❚❚ Pause</button>
+                <button class="chip" id="tReset">Reset</button>
+            </div>
+            <div class="panel-grid" style="grid-template-columns:repeat(4,1fr); margin-top:8px">
+                <button class="chip" data-adj="-60">−1m</button>
+                <button class="chip" data-adj="-10">−10s</button>
+                <button class="chip" data-adj="10">+10s</button>
+                <button class="chip" data-adj="60">+1m</button>
+            </div>
+        </div>
+
+        <!-- Score -->
+        <div class="section">
+            <div class="section-title">Score</div>
+            <div class="sc-grid">
+                <div class="sc-card">
+                    <input id="homeName" type="text" placeholder="Home" maxlength="24">
+                    <div class="sc-val" id="homeScore">0</div>
+                    <div class="sc-btns">
+                        <button class="chip" data-side="home" data-delta="-1">−</button>
+                        <button class="chip" data-side="home" data-delta="1">+</button>
+                    </div>
+                </div>
+                <div class="sc-card">
+                    <input id="awayName" type="text" placeholder="Away" maxlength="24">
+                    <div class="sc-val" id="awayScore">0</div>
+                    <div class="sc-btns">
+                        <button class="chip" data-side="away" data-delta="-1">−</button>
+                        <button class="chip" data-side="away" data-delta="1">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Match clock -->
+        <div class="section">
+            <div class="section-title">Match clock</div>
+            <div class="kv">
+                <span class="kv-k">Label</span>
+                <input id="matchLbl" type="text" maxlength="8" placeholder="HT" style="max-width:120px">
+            </div>
+            <div class="kv">
+                <span class="kv-k">Frozen time</span>
+                <input id="matchVal" type="text" maxlength="12" placeholder="45:00" style="max-width:140px">
+            </div>
+        </div>
+
+        <!-- Duration -->
+        <div class="section">
+            <div class="section-title">Halftime length (minutes)</div>
+            <div class="panel-grid" style="grid-template-columns:repeat(4,1fr)">
+                <button class="chip" data-dur="10">10</button>
+                <button class="chip" data-dur="15">15</button>
+                <button class="chip" data-dur="20">20</button>
+                <button class="chip" data-dur="25">25</button>
+            </div>
+        </div>
+
+        <!-- Display -->
+        <div class="section">
+            <div class="section-title">Display</div>
+            <div class="kv">
+                <span class="kv-k">Title</span>
+                <input id="title" type="text" maxlength="40" placeholder="HALBZEIT" style="max-width:200px">
+            </div>
+            <div class="kv">
+                <span class="kv-k">Message</span>
+                <input id="message" type="text" maxlength="120" placeholder="Schau gleich weiter..." style="max-width:240px">
+            </div>
+        </div>
+
+        <!-- Slides -->
+        <div class="section">
+            <div class="section-title">Slides (rotation)</div>
+            <div class="sl-grid" id="slideGrid"></div>
+            <div class="panel-grid" style="grid-template-columns:repeat(4,1fr); margin-top:10px">
+                <button class="chip" data-dwell="8000">8s</button>
+                <button class="chip" data-dwell="12000">12s</button>
+                <button class="chip" data-dwell="16000">16s</button>
+                <button class="chip" data-dwell="20000">20s</button>
+            </div>
+        </div>
+
+        <!-- Sponsors -->
+        <div class="section">
+            <div class="section-title">Sponsoren</div>
+            <div id="sponsorList" style="display:flex;flex-direction:column;gap:10px"></div>
+            <button class="chip" id="addSponsor" style="width:100%;margin-top:10px;padding:12px 0">+ Sponsor</button>
+            <div class="kv" style="border:none;padding-top:10px">
+                <span class="kv-k">Dwell pro Sponsor (s)</span>
+                <input id="adDwell" type="number" min="2" max="60" step="1" placeholder="8" style="max-width:80px;text-align:center">
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toasts -->
+    <div class="toast-box" id="toastBox"></div>
+
+    <script>
+    (() => {
+        'use strict';
+        const $ = s => document.querySelector(s);
+        const socket = io();
+
+        let state = {};
+        let typingTimer = null;
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function fmt(sec) {
+            sec = Math.max(0, Math.floor(sec));
+            const m = Math.floor(sec / 60), s = sec % 60;
+            return pad(m) + ':' + pad(s);
+        }
+
+        let endsAt = null, running = false, remaining = 0;
+        setInterval(() => {
+            if (!running || !endsAt) return;
+            const rem = Math.max(0, Math.round((endsAt - Date.now()) / 1000));
+            const el = $('#liveClock');
+            el.textContent = fmt(rem);
+            el.classList.toggle('done', rem <= 0);
+            $('#liveCap').textContent = rem <= 0 ? 'Anpfiff' : 'bis Anpfiff';
+        }, 250);
+
+        function render(s) {
+            state = s;
+            const t = s.timer || {};
+            running = !!t.running;
+            endsAt = t.endsAt;
+            remaining = t.remainingSec || 0;
+            const el = $('#liveClock');
+            el.textContent = fmt(running && endsAt ? Math.max(0, Math.round((endsAt - Date.now())/1000)) : remaining);
+            el.classList.toggle('done', remaining <= 0 && !running);
+            $('#liveCap').textContent = running ? 'bis Anpfiff' : (remaining <= 0 ? 'Anpfiff' : 'pausiert');
+
+            syncUnlessFocused('#homeName', (s.home || {}).name || '');
+            syncUnlessFocused('#awayName', (s.away || {}).name || '');
+            $('#homeScore').textContent = (s.home || {}).score || 0;
+            $('#awayScore').textContent = (s.away || {}).score || 0;
+            syncUnlessFocused('#matchLbl', (s.matchClock || {}).label || '');
+            syncUnlessFocused('#matchVal', (s.matchClock || {}).display || '');
+            syncUnlessFocused('#title', s.title || '');
+            syncUnlessFocused('#message', s.message || '');
+            renderRotation(s.rotation);
+            renderAd(s.ad);
+        }
+        function syncUnlessFocused(sel, val) {
+            const el = $(sel); if (document.activeElement !== el) el.value = val;
+        }
+
+        socket.on('connect',      () => { $('#conn').dataset.s = 'ok';  $('#connTxt').textContent = 'live'; });
+        socket.on('disconnect',   () => { $('#conn').dataset.s = 'off'; $('#connTxt').textContent = 'offline'; });
+        socket.on('connect_error',() => { $('#conn').dataset.s = 'wait'; $('#connTxt').textContent = 'reconnecting'; });
+        socket.on('breakState', render);
+        socket.emit('breakStateGet');
+
+        const patch = partial => socket.emit('breakUpdate', partial);
+
+        $('#tStart').onclick  = () => socket.emit('breakTimer', { action: 'start' });
+        $('#tPause').onclick  = () => socket.emit('breakTimer', { action: 'pause' });
+        $('#tReset').onclick  = () => { socket.emit('breakTimer', { action: 'reset' }); toast('Timer reset', 'info', 1000); };
+        document.querySelectorAll('[data-adj]').forEach(b => b.onclick = () => socket.emit('breakTimer', { action: 'adjust', deltaSec: parseInt(b.dataset.adj, 10) }));
+        document.querySelectorAll('[data-dur]').forEach(b => b.onclick = () => { socket.emit('breakTimer', { action: 'duration', sec: parseInt(b.dataset.dur, 10) * 60 }); toast('Halftime: ' + b.dataset.dur + ' min', 'info', 1000); });
+
+        document.querySelectorAll('[data-side]').forEach(b => b.onclick = () => socket.emit('breakScore', { side: b.dataset.side, delta: parseInt(b.dataset.delta, 10) }));
+
+        function debounce(sel, fn) {
+            const el = $(sel);
+            el.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(() => fn(el.value), 350);
+            });
+        }
+        debounce('#homeName', v => patch({ home: { name: v } }));
+        debounce('#awayName', v => patch({ away: { name: v } }));
+        debounce('#matchLbl', v => patch({ matchClock: { label: v } }));
+        debounce('#matchVal', v => patch({ matchClock: { display: v } }));
+        debounce('#title',    v => patch({ title: v }));
+        debounce('#message',  v => patch({ message: v }));
+
+        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', weather: 'Wetter', brand: 'Brand', mercury: 'Quecksilber', flowfield: 'Flowfield', nebel: 'Nebel' };
+        let rotation = {};
+        function renderRotation(r) {
+            rotation = r || {};
+            const active = r.active || {};
+            const grid = $('#slideGrid');
+            grid.innerHTML = '';
+            Object.keys(SLIDE_LABELS).forEach(k => {
+                const row = document.createElement('div');
+                row.className = 'sl-toggle' + (active[k] ? ' on' : '');
+                row.innerHTML = '<span>' + SLIDE_LABELS[k] + '</span>';
+                const pin = document.createElement('button');
+                pin.className = 'pin' + (r.pinned === k ? ' on' : '');
+                pin.textContent = r.pinned === k ? '✓' : 'pin';
+                pin.onclick = e => {
+                    e.stopPropagation();
+                    const next = r.pinned === k ? null : k;
+                    socket.emit('breakRotation', { pinned: next });
+                };
+                row.appendChild(pin);
+                row.onclick = () => socket.emit('breakRotation', { active: { [k]: !active[k] } });
+                grid.appendChild(row);
+            });
+        }
+        document.querySelectorAll('[data-dwell]').forEach(b => b.onclick = () => {
+            socket.emit('breakRotation', { dwellMs: parseInt(b.dataset.dwell, 10) });
+            toast('Dwell: ' + (parseInt(b.dataset.dwell,10)/1000) + 's', 'info', 1000);
+        });
+
+        function renderAd(ad) {
+            ad = ad || {};
+            const items = Array.isArray(ad.items) ? ad.items : [];
+            const list = $('#sponsorList');
+            if (!list) return;
+            syncUnlessFocused('#adDwell', ad.dwellMs ? Math.round(ad.dwellMs / 1000) : 8);
+            if (list.dataset.count === String(items.length)) return;
+            list.dataset.count = String(items.length);
+            if (items.length === 0) {
+                list.innerHTML = '<div style="color:var(--text-3);font-size:13px;font-style:italic;padding:8px 4px">Keine Sponsoren — „+ Sponsor” tippen</div>';
+                return;
+            }
+            list.innerHTML = items.map((s, i) => sponsorRowHtml(s, i)).join('');
+            list.querySelectorAll('[data-sidx]').forEach(row => {
+                const i = +row.dataset.sidx;
+                const bind = (sel, field) => {
+                    const el = row.querySelector(sel);
+                    let t;
+                    el.addEventListener('input', () => {
+                        clearTimeout(t);
+                        t = setTimeout(() => socket.emit('breakAd', { op: 'update', i, patch: { [field]: el.value } }), 200);
+                    });
+                };
+                bind('.sr-name', 'orgName');
+                bind('.sr-tag',  'tagline');
+                row.querySelector('.sr-del').onclick = () => socket.emit('breakAd', { op: 'remove', i });
+            });
+        }
+        function sponsorRowHtml(s, i) {
+            return (
+                '<div class="sr-row" data-sidx="' + i + '">' +
+                '<div class="sr-head"><div class="sr-num">' + (i + 1) + '</div>' +
+                '<div class="sr-right"><button class="chip sr-del" type="button" title="Entfernen">×</button></div></div>' +
+                '<input class="sr-name" type="text" maxlength="60" value="' + escapeHtml(s.orgName || '') + '" placeholder="Name / Organisation">' +
+                '<input class="sr-tag"  type="text" maxlength="80" value="' + escapeHtml(s.tagline || '') + '" placeholder="Tagline (optional)">' +
+                '</div>'
+            );
+        }
+        $('#addSponsor').onclick = () => { socket.emit('breakAd', { op: 'add' }); };
+        debounce('#adDwell', v => {
+            const ms = parseInt(v, 10);
+            if (Number.isFinite(ms)) socket.emit('breakAd', { op: 'dwell', dwellMs: ms * 1000 });
+        });
+
+        function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+        function toast(msg, type = 'info', dur = 2000) {
+            const c = $('#toastBox');
+            while (c.children.length >= 2) c.removeChild(c.firstChild);
+            const t = document.createElement('div');
+            t.className = 'toast t-' + type; t.textContent = msg;
+            c.appendChild(t);
+            requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, dur);
+        }
+    })();
+    </script>
+</body>
+</html>

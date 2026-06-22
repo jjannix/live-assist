@@ -1,10 +1,14 @@
 const express = require('express');
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 const socketIo = require('socket.io');
 const { default: OBSWebSocket } = require('obs-websocket-js');
 const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/factory');
-const config = require('./config/config');
+const config = require('./config');
+const breakState = require('./break-state');
+const weather = require('./weather-state');
 
 // .env is the single source of truth. Loaded once at boot with
 // override:true so a hand-edited (or in-app-edited) file always wins
@@ -131,6 +135,54 @@ function broadcastChannel(channelId) {
     }).catch(() => { /* ignore — backend is offline */ });
 }
 
+/**
+ * Read the gain to use for a save/restore snapshot. Prefers the gain
+ * the backend last COMMANDED (always accurate) over a fresh read.
+ *
+ * Why: Voicemeeter's reported gain lags behind writes — its parameter
+ * cache refreshes on Voicemeeter's own schedule — so snapshotting a
+ * channel right after fading it can capture the OLD value. That
+ * corrupted the Game/Break level memory: TV faded to silence on
+ * Break, then on the next Game On the snapshot read the stale -60
+ * instead of the real -25.3, so TV "never went back up". The
+ * commanded-gain cache reflects exactly what we sent, so the snapshot
+ * is always correct.
+ *
+ * Falls back to a real read on the very first run, before anything
+ * has been commanded (e.g. right after boot, levels set in VM's own
+ * UI before the app touched them).
+ */
+async function snapshotGain(channelId) {
+    const commanded = (typeof audioBackend.getLastCommandedGain === 'function')
+        ? audioBackend.getLastCommandedGain(channelId)
+        : undefined;
+    if (typeof commanded === 'number' && Number.isFinite(commanded)) return commanded;
+    try {
+        const s = await audioBackend.getChannelState(channelId);
+        return s.gainDb;
+    } catch (_) {
+        return -60;
+    }
+}
+
+/**
+ * Build an onProgress callback for applyPreset that streams fader
+ * positions to every client during the ramp, so the on-screen faders
+ * glide with the audio instead of snapping to the target at the end
+ * (which reads as a "jump" even when the audio itself ramps cleanly).
+ * Emits at most every ~50 ms to avoid flooding slow links.
+ */
+function makeFadeReporter() {
+    let lastEmit = 0;
+    return gains => {
+        const now = Date.now();
+        if (now - lastEmit < 50) return;
+        lastEmit = now;
+        if (typeof gains[3] === 'number') io.emit('faderState', { stripIndex: 3, gain: gains[3] });
+        if (typeof gains[4] === 'number') io.emit('faderState', { stripIndex: 4, gain: gains[4] });
+    };
+}
+
 async function selectAndInitAudioBackend() {
     const mode = (process.env.AUDIO_BACKEND || 'auto').toLowerCase().trim();
     try {
@@ -160,7 +212,25 @@ async function selectAndInitAudioBackend() {
 }
 
 // Server-side profile storage (keyed by name; value is { 3: gainDb, 4: gainDb })
-const profiles = {};
+// Persisted to disk so profiles survive restarts (same pattern as break-state.json).
+const PROFILES_FILE = path.join(__dirname, 'audio-profiles.json');
+
+function loadProfilesFromDisk() {
+    try {
+        const raw = fs.readFileSync(PROFILES_FILE, 'utf8');
+        return JSON.parse(raw);
+    } catch (_) {
+        return {};
+    }
+}
+
+function persistProfiles() {
+    try {
+        fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles, null, 2), 'utf8');
+    } catch (_) { /* best-effort */ }
+}
+
+const profiles = loadProfilesFromDisk();
 
 // Saved audio levels per mode. Updated every time you leave a mode.
 // null = never visited, use defaults.
@@ -202,6 +272,48 @@ app.get('/api/network', (req, res) => {
     res.json({ urls: lanUrls() });
 });
 
+// ── Break-screen sponsor ad upload ────────────────────────────────
+// The operator picks a logo file on their phone; the browser reads it
+// as base64 and POSTs it here. We decode and save to public/break-ads/
+// (served statically by Express), then point break-state at the file.
+// No multer, no multipart — matches the project's no-extra-deps ethos.
+const BREAK_ADS_DIR = path.join(__dirname, 'public', 'break-ads');
+try { fs.mkdirSync(BREAK_ADS_DIR, { recursive: true }); } catch (_) { /* exists */ }
+app.post('/api/break-ad/upload', (req, res) => {
+    try {
+        const { image, sponsorIndex } = (req.body || {});
+        if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+            return res.status(400).json({ ok: false, error: 'Expected a data:image/* URL' });
+        }
+        const m = image.match(/^data:image\/(png|jpe?g|webp|svg\+xml);base64,(.+)$/);
+        if (!m) return res.status(400).json({ ok: false, error: 'Unsupported image format' });
+        const ext = m[1] === 'jpeg' ? 'jpg' : (m[1] === 'svg+xml' ? 'svg' : m[1]);
+        const buf = Buffer.from(m[2], 'base64');
+        if (buf.length > 8 * 1024 * 1024) {
+            return res.status(413).json({ ok: false, error: 'Image too large (max 8 MB)' });
+        }
+        const idx = Number.isInteger(sponsorIndex) ? sponsorIndex : 0;
+        // Ensure the sponsor exists at the target index (auto-create if needed)
+        while (breakState.get().ad.items.length <= idx) breakState.addSponsor({});
+        const filename = 'sponsor-' + idx + '-' + Date.now() + '.' + ext;
+        fs.writeFileSync(path.join(BREAK_ADS_DIR, filename), buf);
+        // Prune old logos for THIS sponsor slot only — keep other sponsors intact
+        try {
+            const prefix = 'sponsor-' + idx + '-';
+            for (const f of fs.readdirSync(BREAK_ADS_DIR)) {
+                if (f.startsWith(prefix) && f !== filename) {
+                    try { fs.unlinkSync(path.join(BREAK_ADS_DIR, f)); } catch (_) {}
+                }
+            }
+        } catch (_) {}
+        breakState.setSponsorLogo(idx, filename);
+        res.json({ ok: true, logoFile: filename, url: '/break-ads/' + filename, sponsorIndex: idx });
+    } catch (e) {
+        console.error('Ad upload failed:', e.message);
+        res.status(500).json({ ok: false, error: e.message });
+    }
+});
+
 // Re-read .env and re-initialise OBS + audio so edits take effect
 // without restarting the process. The HTTP server keeps running; the
 // status pills flap briefly and recover on their own.
@@ -219,6 +331,9 @@ function reloadRuntime() {
     Promise.resolve()
         .then(() => previous.shutdown()).catch(() => {})
         .then(() => selectAndInitAudioBackend());
+
+    // Weather — restart the poller with (possibly) new stadium coords.
+    startWeather();
 }
 
 function lanUrls() {
@@ -234,6 +349,24 @@ function lanUrls() {
 }
 
 app.use(express.static('public'));
+
+// ── Break-screen state → broadcast to every client on change ────
+// break.html (beamer) and break-control.html (operator) are both views
+// over the same state. One subscription fans updates to all sockets.
+breakState.subscribe(state => io.emit('breakState', state));
+
+// ── Weather poller (Open-Meteo) ───────────────────────────────────
+// Feeds the beamer's "weather" slide. Restarted by reloadRuntime() so
+// editing STADIUM_LAT/LON in Settings takes effect without a restart.
+function startWeather() {
+    weather.restart({
+        lat: process.env.STADIUM_LAT,
+        lon: process.env.STADIUM_LON,
+        location: process.env.STADIUM_NAME || '',
+        logger: line => console.log('[weather] ' + line),
+    });
+}
+startWeather();
 
 io.on('connection', async socket => {
     console.log('Client connected');
@@ -323,6 +456,35 @@ io.on('connection', async socket => {
         }
     });
 
+    // ── OBS preview (on-demand single frame) ────────────────────
+    // The operator taps "peek" to capture ONE frame of PREVIEW_SOURCE
+    // (default: the Live scene) — used to check whether the live feed
+    // has resumed while the beamer shows break images. No continuous
+    // streaming, no loop: one request → one JPEG, sent as raw bytes.
+    socket.on('getPreview', async () => {
+        try {
+            const source = process.env.PREVIEW_SOURCE || 'Live Übertragung';
+            const width = parseInt(process.env.PREVIEW_WIDTH, 10) || 480;
+            const quality = Math.max(1, Math.min(100, parseInt(process.env.PREVIEW_QUALITY, 10) || 70));
+            const res = await obs.call('GetSourceScreenshot', {
+                sourceName: source,
+                imageFormat: 'jpeg',
+                imageWidth: width,
+                imageCompressionQuality: quality,
+            });
+            // OBS returns a base64 data URI. Strip the prefix and emit
+            // raw bytes so Socket.IO sends a binary frame instead of a
+            // ~33% larger base64 string.
+            const b64 = (res && res.imageData || '').replace(/^data:image\/\w+;base64,/, '');
+            socket.emit('previewFrame', Buffer.from(b64, 'base64'));
+        } catch (err) {
+            const msg = err && err.message ? err.message : err;
+            console.error('Preview failed:', msg);
+            socket.emit('previewError', String(msg));
+            io.emit('terminalOutput', 'Preview failed: ' + msg);
+        }
+    });
+
     // ── Save / Load audio profiles ──────────────────────────────
     socket.on('saveProfile', async data => {
         if (!audioBackend.isConnected()) return;
@@ -333,6 +495,7 @@ io.on('connection', async socket => {
                 audioBackend.getChannelState(4),
             ]);
             profiles[name] = { 3: s3.gainDb, 4: s4.gainDb };
+            persistProfiles();
             socket.emit('profileSaved', { name, gains: profiles[name] });
             io.emit('terminalOutput', 'Saved profile: ' + name);
         } catch (err) {
@@ -343,7 +506,10 @@ io.on('connection', async socket => {
     socket.on('loadProfile', async data => {
         if (!audioBackend.isConnected()) return;
         const p = profiles[data.name];
-        if (!p) return;
+        if (!p) {
+            socket.emit('terminalOutput', 'No profile "' + data.name + '" saved yet — use + Save first');
+            return;
+        }
         try {
             await audioBackend.setMultiChannelGain({ 3: p[3], 4: p[4] });
             io.emit('profileLoaded', { name: data.name, gains: p });
@@ -402,13 +568,13 @@ io.on('connection', async socket => {
 
     socket.on('GameAction', async () => {
         try {
-            // Save current levels as Break's state before leaving it
+            // Save current levels as Break's state before leaving it.
+            // Uses snapshotGain (last COMMANDED gain) — a fresh Voicemeeter
+            // read can lag behind our writes and capture the wrong level,
+            // which is what broke the level memory (TV "never went back up").
             if (audioBackend.isConnected()) {
-                const [tvNow, spNow] = await Promise.all([
-                    audioBackend.getChannelState(3),
-                    audioBackend.getChannelState(4),
-                ]);
-                savedBreakLevels = { 3: tvNow.gainDb, 4: spNow.gainDb };
+                const [tvNow, spNow] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
+                savedBreakLevels = { 3: tvNow, 4: spNow };
             }
 
             const tvTarget = savedGameLevels ? savedGameLevels[3] : GAME_DEFAULT.tv;
@@ -420,16 +586,14 @@ io.on('connection', async socket => {
 
             if (audioBackend.isConnected()) {
                 io.emit('terminalOutput', 'Fading audio.');
-                const [tvStart, spStart] = await Promise.all([
-                    audioBackend.getChannelState(3),
-                    audioBackend.getChannelState(4),
-                ]);
+                const [tvStart, spStart] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
                 await audioBackend.applyPreset({
                     channels: [
-                        { id: 3, fromDb: tvStart.gainDb, toDb: tvTarget },
-                        { id: 4, fromDb: spStart.gainDb, toDb: spTarget },
+                        { id: 3, fromDb: tvStart, toDb: tvTarget },
+                        { id: 4, fromDb: spStart, toDb: spTarget },
                     ],
                     durationMs: AUDIO_FADE_DURATION_MS,
+                    onProgress: makeFadeReporter(),
                 });
                 io.emit('faderState', { stripIndex: 3, gain: tvTarget });
                 io.emit('faderState', { stripIndex: 4, gain: spTarget });
@@ -448,15 +612,13 @@ io.on('connection', async socket => {
 
     socket.on('PauseAction', async () => {
         try {
-            // Snapshot current levels BEFORE fading, so GameAction
-            // can restore them exactly.
             if (audioBackend.isConnected()) {
-                const [tvNow, spNow] = await Promise.all([
-                    audioBackend.getChannelState(3),
-                    audioBackend.getChannelState(4),
-                ]);
+                // Snapshot current levels BEFORE fading, so GameAction
+                // can restore them exactly. snapshotGain (last commanded
+                // gain) avoids the stale-read trap that broke level memory.
+                const [tvNow, spNow] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
                 // Save current levels as Game's state before leaving it
-                savedGameLevels = { 3: tvNow.gainDb, 4: spNow.gainDb };
+                savedGameLevels = { 3: tvNow, 4: spNow };
 
                 // Switch OBS scene first for instant visual feedback
                 await obs.call('SetCurrentProgramScene', { sceneName: 'Spotify' });
@@ -467,10 +629,11 @@ io.on('connection', async socket => {
 
                 await audioBackend.applyPreset({
                     channels: [
-                        { id: 3, fromDb: tvNow.gainDb, toDb: tvTarget },
-                        { id: 4, fromDb: spNow.gainDb, toDb: spTarget },
+                        { id: 3, fromDb: tvNow, toDb: tvTarget },
+                        { id: 4, fromDb: spNow, toDb: spTarget },
                     ],
                     durationMs: AUDIO_FADE_DURATION_MS,
+                    onProgress: makeFadeReporter(),
                 });
                 io.emit('faderState', { stripIndex: 3, gain: tvTarget });
                 io.emit('faderState', { stripIndex: 4, gain: spTarget });
@@ -488,6 +651,67 @@ io.on('connection', async socket => {
         }
     });
 
+    // ── Audio-only presets (the Game / Break chips in Profiles) ──
+    // Same audio fade as the big action buttons (uses the same level
+    // memory: savedGameLevels / savedBreakLevels), but WITHOUT switching
+    // the OBS scene. The level memory is NOT overwritten — these are
+    // "quick audio" helpers, not mode changes.
+    socket.on('audioPreset', async data => {
+        if (!audioBackend.isConnected()) return;
+        const mode = data.mode;
+        if (mode !== 'game' && mode !== 'break') return;
+        try {
+            const [tvStart, spStart] = await Promise.all([snapshotGain(3), snapshotGain(4)]);
+            const tvTarget = mode === 'game'
+                ? (savedGameLevels ? savedGameLevels[3] : GAME_DEFAULT.tv)
+                : BREAK_PRESET.tv;
+            const spTarget = mode === 'game'
+                ? GAME_DEFAULT.sp
+                : (savedBreakLevels ? savedBreakLevels[4] : BREAK_PRESET.sp);
+
+            await audioBackend.applyPreset({
+                channels: [
+                    { id: 3, fromDb: tvStart, toDb: tvTarget },
+                    { id: 4, fromDb: spStart, toDb: spTarget },
+                ],
+                durationMs: AUDIO_FADE_DURATION_MS,
+                onProgress: makeFadeReporter(),
+            });
+            io.emit('faderState', { stripIndex: 3, gain: tvTarget });
+            io.emit('faderState', { stripIndex: 4, gain: spTarget });
+            io.emit('terminalOutput', 'Audio preset ' + mode + ': TV ' + tvTarget.toFixed(1) + ' dB, Spotify ' + spTarget.toFixed(1) + ' dB');
+        } catch (err) {
+            console.error('audioPreset failed:', err);
+        }
+    });
+
+    // ── Break screen (audience + operator controls) ────────────
+    // Send full state on connect so a refresh / new device is immediately correct.
+    socket.emit('breakState', breakState.get());
+
+    socket.on('breakUpdate',  partial => breakState.update(partial));
+    socket.on('breakScore',   d => breakState.setScore(d.side, d.delta));
+    socket.on('breakTimer',   d => {
+        switch (d.action) {
+            case 'start':   breakState.startTimer(); break;
+            case 'pause':   breakState.pauseTimer(); break;
+            case 'reset':   breakState.resetTimer(d.sec); break;
+            case 'adjust':  breakState.adjustTimer(d.deltaSec); break;
+            case 'duration':breakState.setDuration(d.sec); break;
+        }
+    });
+    socket.on('breakRotation', patch => breakState.setRotation(patch));
+    // breakAd routes to addSponsor / updateSponsor / removeSponsor
+    // based on the op field: { op: 'add' } | { op: 'update', i, patch } | { op: 'remove', i }
+    socket.on('breakAd', payload => {
+        if (!payload || typeof payload !== 'object') return;
+        if (payload.op === 'add') breakState.addSponsor(payload.sponsor || {});
+        else if (payload.op === 'update') breakState.updateSponsor(payload.i, payload.patch || {});
+        else if (payload.op === 'remove') breakState.removeSponsor(payload.i);
+        else if (payload.op === 'dwell') breakState.setAdDwell(payload.dwellMs);
+        // Legacy single-sponsor patches still work via setAd → items[0]
+        else breakState.setAd(payload);
+    });
     socket.on('disconnect', () => {
         console.log('Client disconnected');
         io.emit('terminalOutput', 'Client disconnected');

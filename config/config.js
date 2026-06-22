@@ -49,6 +49,21 @@ const SCHEMA = [
       help: 'How long crossfades take, in milliseconds. 900 is a good default.' },
     { key: 'AUDIO_DEBUG', label: 'Verbose audio logging', type: 'bool', default: 'false',
       help: 'Stream detailed audio-backend messages to the activity log.' },
+
+    { section: 'OBS preview', key: 'PREVIEW_SOURCE', label: 'Scene to peek at', type: 'text',
+      default: 'Live Übertragung',
+      help: 'Which OBS scene/source the on-demand "peek" captures. Defaults to the live feed so you can check whether the match has resumed while the beamer shows break images. Must match an OBS source name exactly.' },
+    { key: 'PREVIEW_WIDTH', label: 'Preview width (px)', type: 'number', default: '480',
+      help: 'Capture width. Smaller is faster to encode and cheaper over WiFi; height keeps the source aspect ratio.' },
+    { key: 'PREVIEW_QUALITY', label: 'Preview JPEG quality (1–100)', type: 'number', default: '70',
+      help: 'Compression quality of the captured frame. 60–80 is a good range for a confidence check.' },
+
+    { section: 'Weather', key: 'STADIUM_NAME', label: 'Location name', type: 'text', default: '',
+      help: 'Label shown on the weather slide (city or ground name). Optional.' },
+    { key: 'STADIUM_LAT', label: 'Latitude', type: 'text', default: '49.318',
+      help: 'Decimal degrees. Used by the weather slide to fetch local conditions.' },
+    { key: 'STADIUM_LON', label: 'Longitude', type: 'text', default: '7.344',
+      help: 'Decimal degrees.' },
 ];
 
 /** Load .env once at boot. override:true makes the file authoritative. */

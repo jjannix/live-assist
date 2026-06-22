@@ -1,3 +1,5 @@
 node_modules
 .env
-data/
+break-state.json
+audio-profiles.json
+public/break-ads/

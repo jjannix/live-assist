@@ -19,14 +19,6 @@
     <!-- Header (Status Bar) -->
     <header class="topbar">
         <span class="logo">jnk Live Assist</span>
-        <div class="topbar-nav">
-            <button class="topbar-link" onclick="location.href='/config.html'" aria-label="Open settings" title="Settings">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            </button>
-            <button class="topbar-link" onclick="location.href='/dashboard.html'" aria-label="Open health dashboard" title="Health dashboard">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            </button>
-        </div>
         <div class="status-pill">
             <span class="conn-dot" id="conn" data-s="wait"></span>
             <span class="conn-dot" id="obsConn" data-s="wait"></span>
@@ -80,14 +72,31 @@
             </div>
         </div>
 
-        <!-- Hero Space (Dynamic State Display) -->
-        <div class="hero-space">
-            <div class="hero-ring" id="heroRing">
-                <svg id="heroIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10"></circle>
-                </svg>
+        <!-- Hero Space: mode ring, or the live-peek card (data-preview swaps them) -->
+        <div class="hero-space" id="heroSpace" data-preview="idle">
+            <div class="hero-idle" id="heroIdle">
+                <div class="hero-ring" id="heroRing">
+                    <svg id="heroIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                </div>
+                <div class="hero-text" id="heroText">Waiting...</div>
             </div>
-            <div class="hero-text" id="heroText">Waiting...</div>
+            <div class="hero-card" id="heroCard">
+                <div class="hero-thumb">
+                    <img id="previewImg" alt="Live preview">
+                    <div class="hero-skeleton"></div>
+                    <div class="hero-err" id="previewErr"></div>
+                </div>
+                <div class="hero-meta">
+                    <span class="hero-meta-lbl">LIVE PEEK</span>
+                    <span class="hero-meta-ts" id="previewTs">—</span>
+                    <span class="hero-meta-age" id="previewAge"></span>
+                    <button class="hero-meta-close" id="previewClose" type="button" aria-label="Close preview">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Quick Panels: Scenes & Presets -->
@@ -108,14 +117,6 @@
                     <button class="chip" id="saveProfileBtn">+ Save</button>
                 </div>
             </div>
-            <div class="panel">
-                <span class="panel-lbl">PRESETS</span>
-                <div class="panel-grid">
-                    <button class="chip preset-chip" data-preset="game">Game</button>
-                    <button class="chip preset-chip" data-preset="break">Break</button>
-                    <button class="chip preset-chip" data-preset="balanced">Mix</button>
-                </div>
-            </div>
         </div>
 
     </main>
@@ -123,14 +124,31 @@
     <!-- Bottom Dock (Primary Mobile Interactions) -->
     <div class="dock">
         <div class="dock-utils">
-            <button class="util-btn" id="dimBtn" aria-label="Toggle Dim Mode">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </button>
+            <div class="dock-util-group">
+                <button class="util-btn" id="peekBtn" data-state="idle" aria-label="Peek at live feed">
+                    <svg class="ic-eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="ic-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+                </button>
+                <button class="util-btn" id="dimBtn" aria-label="Toggle Dim Mode">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </button>
+            </div>
             <span class="dock-hint">Main Actions</span>
-            <button class="util-btn" id="logBtn" aria-label="Activity Log">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-                <span class="badge" id="badge" hidden>0</span>
-            </button>
+            <div class="dock-util-group">
+                <button class="util-btn" onclick="location.href='/config.html'" aria-label="Settings" title="Settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+                <button class="util-btn" onclick="location.href='/dashboard.html'" aria-label="Health dashboard" title="Health dashboard">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </button>
+                <button class="util-btn" onclick="location.href='/break-control.html'" aria-label="Break screen controls" title="Break screen controls">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </button>
+                <button class="util-btn" id="logBtn" aria-label="Activity Log">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    <span class="badge" id="badge" hidden>0</span>
+                </button>
+            </div>
         </div>
         <div class="dock-actions">
             <button class="action-btn game" data-mode="game">
@@ -166,7 +184,7 @@
         const $ = s => document.querySelector(s);
         const $$ = s => document.querySelectorAll(s);
         const socket = io();
-        let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now();
+        let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now(), previewVisible = false;
         const haptic = ms => { if (navigator.vibrate) navigator.vibrate(ms); };
 
         // ── Timer
@@ -214,6 +232,9 @@
         function setMode(m) {
             mode = m;
             document.body.dataset.mode = m;
+            // Clear any stale peek frame whenever the mode changes so
+            // the hero never shows an out-of-date capture.
+            if (previewVisible) hidePreview();
 
             $('#chTv').classList.toggle('idle', m === 'break');
             $('#chSp').classList.toggle('idle', m === 'game');
@@ -284,6 +305,89 @@
         });
 
         setMode('unknown');
+
+        // ── OBS preview (on-demand peek at the live feed) ─────────
+        // Tap the dock's eye util-btn to capture ONE frame of
+        // PREVIEW_SOURCE (default: the Live scene) — checks whether
+        // the feed has resumed while the beamer shows break images.
+        // No streaming: one request → one JPEG → the hero swaps from
+        // the mode ring to a peek card. Tap again (or tap the image)
+        // to refresh; the ✕ dismisses back to the ring.
+        const heroSpace   = $('#heroSpace');
+        const peekBtn     = $('#peekBtn');
+        const previewImg  = $('#previewImg');
+        const previewTs   = $('#previewTs');
+        const previewAge  = $('#previewAge');
+        const previewErr  = $('#previewErr');
+        const previewClose = $('#previewClose');
+
+        let previewObjectUrl = null;
+        let previewCapturedAt = 0;
+        let previewAgeTimer = null;
+
+        // One token drives every visual: the hero swaps idle⇄card and
+        // the dock button swaps eye⇄spinner + active highlight.
+        function previewState(s) {
+            heroSpace.dataset.preview = s;
+            peekBtn.dataset.state = s;
+            peekBtn.classList.toggle('active', s !== 'idle');
+        }
+
+        function updateAge() {
+            if (!previewCapturedAt) return;
+            const s = Math.max(0, Math.floor((Date.now() - previewCapturedAt) / 1000));
+            let txt;
+            if (s < 4)       txt = 'just now';
+            else if (s < 60) txt = s + 's ago';
+            else             txt = Math.floor(s / 60) + 'm ' + (s % 60) + 's ago';
+            previewAge.textContent = '· ' + txt;
+            // Amber once the frame is old enough that the match state
+            // may have changed since capture — a nudge to re-peek.
+            previewAge.classList.toggle('stale', s >= 15);
+        }
+        function startAgeTimer() { stopAgeTimer(); updateAge(); previewAgeTimer = setInterval(updateAge, 1000); }
+        function stopAgeTimer() { if (previewAgeTimer) { clearInterval(previewAgeTimer); previewAgeTimer = null; } }
+
+        function showPreviewFrame(buf) {
+            const blob = new Blob([buf], { type: 'image/jpeg' });
+            if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = URL.createObjectURL(blob);
+            previewImg.src = previewObjectUrl;
+            previewCapturedAt = Date.now();
+            previewTs.textContent = new Date(previewCapturedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            previewVisible = true;
+            previewState('live');
+            startAgeTimer();
+            haptic(8);
+        }
+        function hidePreview() {
+            stopAgeTimer();
+            previewCapturedAt = 0;
+            previewVisible = false;
+            if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+            previewImg.src = '';
+            previewAge.textContent = '';
+            previewAge.classList.remove('stale');
+            previewState('idle');
+        }
+        function requestPreview() {
+            if ($('#obsConn').dataset.s !== 'ok') { toast('OBS not connected', 'err'); return; }
+            if (heroSpace.dataset.preview === 'loading') return;   // ignore double-taps mid-capture
+            haptic(10);
+            previewState('loading');
+            socket.emit('getPreview');
+        }
+        peekBtn.addEventListener('click', requestPreview);
+        previewImg.addEventListener('click', requestPreview);
+        previewClose.addEventListener('click', e => { e.stopPropagation(); haptic(8); hidePreview(); });
+
+        socket.on('previewFrame', buf => showPreviewFrame(buf));
+        socket.on('previewError', msg => {
+            previewErr.textContent = msg || 'capture failed';
+            previewState('error');
+            stopAgeTimer();
+            toast('Preview failed: ' + msg, 'err', 3000);
+        });
 
         // ── Faders
         function updFill(id) {
@@ -373,24 +477,17 @@
             socket.emit('saveProfile', { name });
         });
 
-        // Load profile on tap
+        // Load profile on tap. Shows a warning if the profile hasn't been
+        // saved yet (profiles are now persisted to disk, but on first run
+        // the "game" and "break" chips are just placeholders).
         $$('.profile-chip').forEach(btn => btn.addEventListener('click', () => {
             haptic(10);
-            socket.emit('loadProfile', { name: btn.dataset.profile });
-            toast(`Loading ${btn.dataset.profile} profile`, 'info', 1000);
+            const mode = btn.dataset.profile;  // 'game' or 'break'
+            socket.emit('audioPreset', { mode });
+            toast('Audio → ' + mode, 'info', 1000);
         }));
 
-        // ── Presets & Scenes
-        const presets = { game: { tv: 0, sp: -60 }, break: { tv: -60, sp: 0 }, balanced: { tv: -6, sp: -6 } };
-        $$('.preset-chip').forEach(btn => btn.addEventListener('click', () => {
-            const p = presets[btn.dataset.preset]; if (!p) return; haptic(10);
-            socket.emit('setVolume', { stripIndex: 3, volume: p.tv });
-            socket.emit('setVolume', { stripIndex: 4, volume: p.sp });
-            $('#tvFader').value = p.tv; updDb('tvDb', p.tv); updFill('tvFader');
-            $('#spFader').value = p.sp; updDb('spDb', p.sp); updFill('spFader');
-            toast(`${btn.dataset.preset[0].toUpperCase() + btn.dataset.preset.slice(1)} preset applied`, 'info', 1500);
-        }));
-
+        // ── Scenes
         $$('.scene-chip').forEach(b => b.addEventListener('click', () => { haptic(10); socket.emit('transition', { sceneName: b.dataset.scene }); }));
 
         // ── Drawer

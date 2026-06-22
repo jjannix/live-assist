@@ -29,6 +29,16 @@ class VoicemeeterBackend extends AudioBackend {
 
         // Mute state tracked server-side (VM reads can be stale)
         this._muteState = { 3: false, 4: false };
+
+        // The last gain we successfully commanded per channel.
+        // Voicemeeter's reported gain can lag behind our writes — its
+        // parameter cache refreshes on Voicemeeter's own schedule
+        // (that's what VBVMR_IsParametersDirty() exists to signal) —
+        // so save/restore snapshots must trust what we SENT, not what
+        // VM currently reports, or switching Game↔Break captures the
+        // wrong level and the channel "never goes back up". Seeded
+        // from a real VM read on connect (syncInitialState).
+        this._commandedGain = {};
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────
@@ -76,6 +86,17 @@ class VoicemeeterBackend extends AudioBackend {
     async setChannelGain(channelId, gainDb) {
         if (!this._connected) return;
         this._vm.setStripGain(channelId, gainDb);
+        this._commandedGain[channelId] = gainDb;
+    }
+
+    /**
+     * Last gain we sent to a channel (or undefined if never set).
+     * Prefer this over a fresh VM read for save/restore snapshots —
+     * VM's parameter cache can lag, so a read right after a write can
+     * return the OLD value and corrupt the snapshot.
+     */
+    getLastCommandedGain(channelId) {
+        return this._commandedGain[channelId];
     }
 
     async toggleMute(channelId) {
@@ -90,7 +111,67 @@ class VoicemeeterBackend extends AudioBackend {
     async setMultiChannelGain(gains) {
         if (!this._connected) return;
         for (const [id, db] of Object.entries(gains)) {
-            this._vm.setStripGain(Number(id), db);
+            const n = Number(id);
+            this._vm.setStripGain(n, db);
+            this._commandedGain[n] = db;
+        }
+    }
+
+    /**
+     * Voicemeeter-optimised fade.
+     *
+     *   • Batches every channel into ONE `VBVMR_SetParameters` script
+     *     call per step (one FFI transition instead of N) so Voicemeeter
+     *     applies them atomically — no inter-channel skew, and far less
+     *     DLL traffic for the ramp to keep up with.
+     *   • Schedules each step from the fade START time, compensating
+     *     for Windows' ~15 ms timer granularity. A naive per-step
+     *     setTimeout stretches a 900 ms fade to ~1.5 s and makes the
+     *     ramp sound lumpy.
+     *   • Yields with setImmediate between steps so socket / OBS
+     *     traffic stays responsive mid-fade.
+     *   • A step that throws (transient DLL hiccup) is logged but does
+     *     NOT abort the fade. The final target is always re-committed
+     *     at the end as a safety net so the fade never gets stuck
+     *     part-way — which is what users hear as a "jump to zero".
+     *   • Calls onProgress(gains) each step so callers can animate UI
+     *     faders in lockstep with the actual audio ramp.
+     */
+    async applyPreset({ channels, durationMs, onProgress }) {
+        if (!this._connected || !channels || channels.length === 0) return;
+        const fadeSteps = 60;
+        const stepMs = Math.max(1, Math.round(durationMs / fadeSteps));
+        const fadeStart = Date.now();
+        let lastErr = null;
+        for (let i = 0; i <= fadeSteps; i++) {
+            const p = i / fadeSteps;
+            const gains = {};
+            const parts = [];
+            for (const ch of channels) {
+                const g = ch.fromDb * (1 - p) + ch.toDb * p;
+                gains[ch.id] = g;
+                // One script line per channel: Strip[n].Gain=db;
+                parts.push('Strip[' + ch.id + '].Gain=' + (+g).toFixed(3) + ';');
+            }
+            try {
+                this._vm.setRawParameters(parts.join(''));
+            } catch (e) {
+                lastErr = e;   // keep going — a blip shouldn't abort the ramp
+            }
+            if (onProgress) { try { onProgress(gains); } catch (_) { /* caller's problem */ } }
+            const nextAt = fadeStart + Math.round((i + 1) * stepMs);
+            while (Date.now() < nextAt) {
+                await new Promise(r => setImmediate(r));
+            }
+        }
+        // Safety net: guarantee the final target is committed and our
+        // commanded-gain cache reflects it, even if a step errored.
+        for (const ch of channels) {
+            this._commandedGain[ch.id] = ch.toDb;
+            try { this._vm.setStripGain(ch.id, ch.toDb); } catch (e) { /* best effort */ }
+        }
+        if (lastErr) {
+            this._log('applyPreset: non-fatal error during fade: ' + (lastErr && lastErr.message ? lastErr.message : lastErr));
         }
     }
 
@@ -101,7 +182,9 @@ class VoicemeeterBackend extends AudioBackend {
             try {
                 this._muteState[ch] = this._vm.getStripMute(ch) !== 0;
                 mute[ch] = this._muteState[ch];
-                fader[ch] = this._vm.getStripGain(ch);
+                const g = this._vm.getStripGain(ch);
+                fader[ch] = g;
+                this._commandedGain[ch] = g;   // seed the cache from reality
             } catch (e) { /* skip */ }
         }
         return { mute, fader };

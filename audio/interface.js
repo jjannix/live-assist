@@ -70,9 +70,14 @@ class AudioBackend {
     /**
      * Smoothly fade multiple channels from current to target.
      *
-     * @param {{ channels: Array<{id:number, fromDb:number, toDb:number}>, durationMs:number }} opts
+     * @param {{ channels: Array<{id:number, fromDb:number, toDb:number}>, durationMs:number, onProgress?: (gains:Object)=>void }} opts
+     *
+     * onProgress (optional) is called with the per-channel gain map at
+     * every step so callers can animate UI faders in lockstep with the
+     * actual audio ramp. It must never throw — backends wrap it in
+     * try/catch, but callers should keep it cheap.
      */
-    async applyPreset({ channels, durationMs }) {
+    async applyPreset({ channels, durationMs, onProgress }) {
         const fadeSteps = 60;
         const stepMs = Math.max(1, Math.round(durationMs / fadeSteps));
         for (let i = 0; i <= fadeSteps; i++) {
@@ -82,9 +87,20 @@ class AudioBackend {
                 gains[ch.id] = ch.fromDb * (1 - p) + ch.toDb * p;
             }
             await this.setMultiChannelGain(gains);
+            if (onProgress) { try { onProgress(gains); } catch (_) { /* caller's problem */ } }
             await new Promise(r => setTimeout(r, stepMs));
         }
     }
+
+    /**
+     * The last gain we successfully commanded for a channel, or
+     * undefined if we never set one. Used for save/restore snapshots
+     * where a fresh backend read could be stale (Voicemeeter's
+     * parameter cache lags behind writes). Backends that can track
+     * this accurately should override; the base returns undefined so
+     * callers fall back to getChannelState().
+     */
+    getLastCommandedGain(/* channelId */) { return undefined; }
 
     /**
      * Read initial state for newly-connected clients. Implementations

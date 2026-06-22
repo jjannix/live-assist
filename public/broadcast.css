@@ -1,0 +1,144 @@
+/*
+ * broadcast.css — shared atmosphere, type, and motion for all
+ * audience-facing screens (break.html and any future match-day view).
+ *
+ * Single source of truth so the slides/views never drift: fix the grain
+ * opacity here, every page picks it up. Slides compose on top of these
+ * primitives; they don't redefine them.
+ *
+ * Consumed by <link rel="stylesheet" href="/broadcast.css"> after a
+ * page's own <style> if it needs local overrides.
+ */
+
+:root {
+    /* Warm-dark base — beamers murder pure black, so we go just
+       off-black with a hint of warmth for depth. */
+    --bg-0: #07070c;
+    --bg-1: #0d0d16;
+    --panel: rgba(16, 16, 26, 0.72);
+
+    /* Ink scale */
+    --ink-0: #f6f6fb;
+    --ink-1: #b8b8c8;
+    --ink-2: #6e6e80;
+    --ink-3: #3a3a48;
+
+    /* Brand + accents */
+    --accent: #7c6aff;
+    --accent-2: #4f7cff;
+    --accent-glow: rgba(124, 106, 255, 0.35);
+    --warm: #f5a623;
+    --warm-glow: rgba(245, 166, 35, 0.4);
+
+    --line: rgba(255, 255, 255, 0.08);
+    --line-2: rgba(255, 255, 255, 0.14);
+
+    /* Type — display monument uses Space Grotesk, body uses Inter.
+       Pages must load these fonts themselves; this file only codifies
+       the families so usage is consistent. */
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-0); }
+body {
+    font-family: var(--font-body);
+    color: var(--ink-0);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* ═══════ Atmosphere layers ═══════
+   Stacked, pointer-events:none, sit behind all content. A page mounts
+   these once (.atmos + .orb.a + .orb.b + .vignette + .grain); slides
+   are content that floats on top. */
+.atmos {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+        radial-gradient(140% 100% at 50% 120%, var(--bg-1) 0%, var(--bg-0) 60%),
+        linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+}
+.orb {
+    position: fixed; z-index: 0; pointer-events: none;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.55;
+    will-change: transform;
+}
+.orb.a {
+    width: 70vw; height: 70vw; max-width: 1100px; max-height: 1100px;
+    top: -25%; left: -15%;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 65%);
+    animation: drift-a 58s ease-in-out infinite;
+}
+.orb.b {
+    width: 60vw; height: 60vw; max-width: 950px; max-height: 950px;
+    bottom: -30%; right: -20%;
+    background: radial-gradient(circle, rgba(79, 124, 255, 0.28) 0%, transparent 65%);
+    animation: drift-b 72s ease-in-out infinite;
+}
+@keyframes drift-a {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(8vw, 6vh) scale(1.12); }
+}
+@keyframes drift-b {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-7vw, -5vh) scale(1.08); }
+}
+.vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 45%, transparent 50%, rgba(0,0,0,0.55) 100%);
+}
+.grain {
+    position: fixed; inset: -50%; z-index: 2; pointer-events: none;
+    opacity: 0.045; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grain-shift 8s steps(6) infinite;
+}
+@keyframes grain-shift {
+    0%   { transform: translate(0, 0); }
+    20%  { transform: translate(-3%, 2%); }
+    40%  { transform: translate(2%, -3%); }
+    60%  { transform: translate(-2%, -2%); }
+    80%  { transform: translate(3%, 1%); }
+    100% { transform: translate(0, 0); }
+}
+
+/* ═══════ Motion primitives ═══════ */
+@keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes ring {
+    0%   { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Staggered entrance — add .enter + .dN to any element */
+.enter { opacity: 0; transform: translateY(16px); animation: enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.18s; }
+.d3 { animation-delay: 0.30s; }
+.d4 { animation-delay: 0.42s; }
+.d5 { animation-delay: 0.54s; }
+.d6 { animation-delay: 0.66s; }
+@keyframes enter { to { opacity: 1; transform: none; } }
+
+/* ═══════ Slide host (rotation engine target) ═══════
+   A .deck contains .slide children; only .slide.active is visible.
+   Crossfade + slight scale so transitions feel intentional. */
+.deck { position: relative; z-index: 3; width: 100%; height: 100%; }
+.slide {
+    position: absolute; inset: 0;
+    opacity: 0; transform: scale(1.02);
+    pointer-events: none;
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.slide.active { opacity: 1; transform: scale(1); pointer-events: auto; }
+
+/* Reduce motion: honour the OS preference */
+@media (prefers-reduced-motion: reduce) {
+    .orb, .grain { animation: none; }
+    .enter { opacity: 1; transform: none; animation: none; }
+    .slide { transition: opacity 0.2s; transform: none; }
+}
