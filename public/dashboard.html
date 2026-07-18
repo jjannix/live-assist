@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
     <title>Live Assist · Health</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/operator-auth.js?v=2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -33,7 +34,7 @@
         .action-btn-danger { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 0; border-radius: 16px; border: 1px solid var(--border-hl); background: var(--card); color: var(--text); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
         .action-btn-danger:active { transform: scale(0.96); background: var(--card-up); }
         .action-btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
-        .back-btn { width: 36px; height: 36px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .back-btn { width: 44px; height: 44px; border-radius: 22px; background: var(--card); border: 1px solid var(--border); color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .back-btn:active { transform: scale(0.9); background: var(--card-up); }
         .back-btn svg { width: 18px; height: 18px; }
         @media (max-width: 480px) {
@@ -104,7 +105,7 @@
     (() => {
         'use strict';
         const $ = s => document.querySelector(s);
-        const socket = io();
+        const socket = operatorSocket();
 
         function pad(n) { return String(n).padStart(2, '0'); }
         function fmtUptime(s) {

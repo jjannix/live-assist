@@ -44,8 +44,8 @@ const DEFAULTS = Object.freeze({
     rotation: {
         // The slides you've curated as the core deck. The others are
         // opt-in from the Slides (rotation) panel in the operator page.
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield', 'nebel'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true, nebel: true },
+        slides: ['clock', 'radial', 'score', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield', 'nebel', 'deutsch'],
+        active: { clock: true, radial: true, score: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true, nebel: true, deutsch: true },
         dwellMs: 12000,
         pinned: null,
     },
@@ -60,6 +60,11 @@ const DEFAULTS = Object.freeze({
         items: [],         // [{ orgName, tagline, url, logoFile }]
         dwellMs: 8000,     // per-sponsor dwell when multiple are configured
     },
+    // Break screen visual mode: 'default' | 'germany'.
+    // Subtly changes the colour palette (accent, glow, orbs) so
+    // the operator can give halftime a national touch.
+    mode: 'default',
+
     // (No additional state — only the 7 curated slides remain.)
     // Live local weather for the "weather" slide. Populated by the
     // weather-state poller (Open-Meteo, no API key). All fields null
@@ -344,6 +349,13 @@ function setWeather(patch) {
     commit();
 }
 
+/** Toggle or set the visual mode ('default' | 'germany'). */
+function setMode(mode) {
+    if (mode !== 'default' && mode !== 'germany') return;
+    state.mode = mode;
+    commit();
+}
+
 // ── pub/sub ───────────────────────────────────────────────────────
 
 /** Subscribe to state changes. Returns an unsubscribe fn. */
@@ -357,7 +369,7 @@ module.exports = {
     startTimer, pauseTimer, resetTimer, setDuration, adjustTimer,
     setRotation, setAd,
     addSponsor, updateSponsor, removeSponsor, setSponsorLogo, setAdDwell,
-    setWeather,
+    setWeather, setMode,
     subscribe,
     DEFAULTS,
 };

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'static-cache-v3';
+const CACHE_NAME = 'static-cache-v4';
 
 self.addEventListener('install', event => {
     event.waitUntil(
@@ -6,8 +6,11 @@ self.addEventListener('install', event => {
             return cache.addAll([
                 './style.css',
                 './app.js',
+                './operator-auth.js?v=2',
                 './manifest.json',
-                './dashboard.html'
+                './dashboard.html',
+                './pairing-control.html',
+                './pair.html'
             ]);
         })
     );

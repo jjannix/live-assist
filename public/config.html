@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
     <title>Live Assist · Settings</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/operator-auth.js?v=2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1/build/qrcode.min.js"></script>
     <style>
         /* Settings page — form fields + save bar.
            Cards (.section), back button (.back-btn) and rows (.kv)
@@ -30,10 +30,11 @@
 
         .field input, .field select, .field textarea {
             width: 100%; background: var(--card-up); border: 1px solid var(--border); border-radius: 12px;
-            padding: 12px 14px; color: var(--text); font-family: inherit; font-size: 14px;
+            min-height: 44px; padding: 12px 14px; color: var(--text); font-family: inherit; font-size: 14px;
             -webkit-appearance: none; appearance: none; transition: border-color 0.15s;
         }
-        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--border-hl); }
+        .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--border-hl); }
+        .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-color: var(--focus); }
         .field input::placeholder, .field textarea::placeholder { color: var(--text-3); }
         .field textarea { resize: vertical; min-height: 54px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5; }
         .field input[type=number] { max-width: 160px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; }
@@ -45,28 +46,27 @@
 
         /* Password reveal */
         .pw-wrap { position: relative; }
-        .pw-wrap input { padding-right: 44px; }
-        .pw-reveal { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 16px; background: transparent; border: none; color: var(--text-3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s; }
+        .pw-wrap input { padding-right: 52px; min-height: 44px; }
+        .pw-reveal { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 22px; background: transparent; border: none; color: var(--text-3); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.15s; }
         .pw-reveal:active { transform: translateY(-50%) scale(0.88); }
         .pw-reveal svg { width: 16px; height: 16px; }
 
         /* Toggle switch */
-        .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex: 0 0 auto; cursor: pointer; }
-        .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
-        .switch .track { position: absolute; inset: 0; background: var(--border-hl); border-radius: 13px; transition: background 0.2s; }
+        .switch { position: relative; display: inline-block; width: 52px; height: 44px; flex: 0 0 auto; cursor: pointer; }
+        .switch input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        .switch .track { position: absolute; left: 3px; right: 3px; top: 9px; bottom: 9px; background: var(--border-hl); border-radius: 13px; transition: background 0.2s; pointer-events: none; }
         .switch .track::before { content: ''; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: var(--text); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+        .switch input:focus-visible + .track { outline: 3px solid var(--focus); outline-offset: 3px; }
         .switch input:checked + .track { background: var(--accent); }
         .switch input:checked + .track::before { transform: translateX(20px); background: #000; }
 
         /* ── Phone access ── */
         .net-desc { font-size: 12px; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
-        .url-kv { cursor: pointer; transition: background 0.15s, transform 0.15s; }
+        .url-kv { min-height: 44px; cursor: pointer; transition: background 0.15s, transform 0.15s; }
         .url-kv:active { background: var(--card-up); transform: scale(0.99); }
         .url-kv .kv-v { color: var(--accent); word-break: break-all; text-align: right; }
         .url-empty { font-size: 12px; color: var(--text-3); padding: 8px 0; }
-        .qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-        .qr-wrap canvas { border-radius: 12px; }
-        .qr-cap { font-size: 11px; color: var(--text-3); }
+        .pair-link { min-height: 44px; margin-top: 14px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--accent); color: #000; font-size: 13px; font-weight: 750; text-decoration: none; }
 
         /* ── Save bar ── */
         .save-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; gap: 14px; padding: 14px 20px calc(20px + var(--safe-b)); background: linear-gradient(to top, #000 55%, rgba(0,0,0,0)); }
@@ -97,12 +97,9 @@
 
         <div class="section">
             <div class="section-title">Phone Access</div>
-            <p class="net-desc">Open one of these on your phone or tablet (same WiFi), or scan the code below. Tap a row to copy it.</p>
+            <p class="net-desc">These are the server's reachable network addresses. Use Controller Pairing to securely add a phone or tablet.</p>
             <div id="netRows"></div>
-            <div class="qr-wrap">
-                <canvas id="qr"></canvas>
-                <div class="qr-cap">Scan to open the controller on your phone</div>
-            </div>
+            <a class="pair-link" href="/pairing-control.html">Manage paired controllers</a>
         </div>
     </main>
 
@@ -214,7 +211,7 @@
 
         // ── Load / save config ──
         async function loadConfig() {
-            const r = await fetch('/api/config');
+            const r = await operatorFetch('/api/config');
             if (!r.ok) throw new Error('Could not load settings');
             const j = await r.json();
             render(j.fields);
@@ -222,7 +219,7 @@
 
         async function loadNetwork() {
             try {
-                const r = await fetch('/api/network');
+                const r = await operatorFetch('/api/network');
                 const j = await r.json();
                 const box = $('#netRows');
                 if (j.urls && j.urls.length) {
@@ -233,7 +230,6 @@
                         navigator.clipboard.writeText(row.dataset.url);
                         toast('Copied to clipboard', 'ok', 1200);
                     }));
-                    if (window.QRCode) QRCode.toCanvas($('#qr'), j.urls[0].url, { width: 172, margin: 2, color: { dark: '#ffffff', light: '#000000' } });
                 } else {
                     box.innerHTML = '<div class="url-empty">No external network interfaces detected.</div>';
                 }
@@ -243,7 +239,7 @@
         saveBtn.addEventListener('click', async () => {
             saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
             try {
-                const r = await fetch('/api/config', {
+                const r = await operatorFetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fields: collect() })
@@ -260,7 +256,7 @@
         });
 
         // ── Status pill (mirror the health page) ──
-        const socket = io();
+        const socket = operatorSocket();
         socket.on('connect',      () => { $('#conn').dataset.s = 'ok';  $('#connTxt').textContent = 'connected'; });
         socket.on('disconnect',   () => { $('#conn').dataset.s = 'off'; $('#connTxt').textContent = 'offline'; });
         socket.on('connect_error',() => { $('#conn').dataset.s = 'wait'; $('#connTxt').textContent = 'reconnecting'; });

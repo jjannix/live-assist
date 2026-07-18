@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
     <title>jnk Live Assist</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/operator-auth.js?v=2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -183,7 +184,7 @@
         'use strict';
         const $ = s => document.querySelector(s);
         const $$ = s => document.querySelectorAll(s);
-        const socket = io();
+        const socket = operatorSocket();
         let unread = 0, drawerOpen = false, mode = 'unknown', t0 = Date.now(), previewVisible = false;
         const haptic = ms => { if (navigator.vibrate) navigator.vibrate(ms); };
 
@@ -512,7 +513,13 @@
             if (data.includes('Failed') || data.includes('failed')) cls = 'l-err';
             else if (data.includes('completed') || data.includes('Connected')) cls = 'l-ok';
             else if (data.includes('Transitioned') || data.includes('Switched') || data.includes('Faded')) cls = 'l-act';
-            line.innerHTML = `<span class="log-t">${time}</span> <span class="${cls}">${data}</span>`;
+            const timeEl = document.createElement('span');
+            timeEl.className = 'log-t';
+            timeEl.textContent = time;
+            const messageEl = document.createElement('span');
+            messageEl.className = cls;
+            messageEl.textContent = String(data);
+            line.append(timeEl, document.createTextNode(' '), messageEl);
             const log = $('#log');
             log.appendChild(line);
             while (log.children.length > 200) log.removeChild(log.firstChild);

@@ -135,18 +135,17 @@ The OBS status dot flips to green within a second. Scene switching now works.
 
 ## Step 5 — Connect your phone (1 min)
 
-On the **broadcast PC**, open Settings (the ⚙️ icon) and scroll to
-**Phone Access**. You'll see one or more URLs like `http://192.168.x.x:3000`
-and a QR code.
+The first time Live Assist opens on the **broadcast PC**, it shows the dedicated
+**Pair Devices** screen before any broadcast controls. Choose the network your
+phone is connected to; a one-time QR code appears automatically.
 
-On your **phone** (same WiFi as the PC):
+On your **phone** (same WiFi as the PC), scan that QR code and confirm the
+device name. The code expires after five minutes and can only be used once.
+The phone stays paired for future events.
 
-- **Scan the QR code**, or
-- **Type the URL** into the browser
-
-The controller loads.
-
-> 📱 You can connect multiple phones/tablets at once — they all stay in sync.
+> 📱 You can pair multiple phones/tablets. They all stay in sync. Use
+> Open **Settings → Manage paired controllers** if a controller should no
+> longer have access.
 
 ---
 

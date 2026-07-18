@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <title>Pair devices · Live Assist</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/operator-auth.js?v=2"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { height: auto; min-height: 100dvh; overflow-y: auto; }
+        [hidden] { display: none !important; }
+        .pairing-topbar { justify-content: flex-start; gap: 14px; }
+        .pairing-page { width: min(100%, 940px); margin: 0 auto; padding: 20px 20px max(40px, var(--safe-b)); }
+        .pairing-head { padding: 34px 0 26px; }
+        .pairing-head h1 { max-width: 680px; font-size: 36px; line-height: 1.08; letter-spacing: -0.035em; text-wrap: balance; }
+        .pairing-head p { max-width: 62ch; margin-top: 12px; color: var(--text-2); font-size: 15px; line-height: 1.55; }
+        .required-note { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--amber); font-size: 12px; font-weight: 750; }
+        .required-note::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+        .pairing-layout { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(300px, 1.1fr); gap: 18px; align-items: stretch; }
+        .qr-stage { min-height: 410px; padding: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 24px; background: var(--card); border: 1px solid var(--border); }
+        .qr-reveal { position: relative; width: min(100%, 300px); aspect-ratio: 1; padding: 0; overflow: hidden; border-radius: 18px; border: 1px solid var(--border-hl); background: #fff; cursor: pointer; }
+        .qr-reveal img { width: 100%; height: 100%; display: block; filter: blur(18px); transform: scale(1.08); transition: filter 0.22s ease-out, transform 0.22s ease-out; }
+        .qr-reveal-label { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,0.34); color: #fff; font-size: 14px; font-weight: 800; text-align: center; transition: opacity 0.18s ease-out; }
+        .qr-reveal.revealed img { filter: none; transform: none; }
+        .qr-reveal.revealed .qr-reveal-label { opacity: 0; pointer-events: none; }
+        .qr-placeholder { width: min(100%, 300px); aspect-ratio: 1; border-radius: 18px; display: grid; place-items: center; background: var(--card-up); color: var(--text-3); font-size: 13px; text-align: center; padding: 30px; }
+        .pairing-code { margin-top: 16px; color: var(--text); font: 850 20px/1 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.16em; }
+        .pairing-expiry { min-height: 20px; margin-top: 9px; color: var(--text-3); font-size: 12px; }
+        .pairing-expiry.success { color: var(--green); }
+        .pairing-expiry.error { color: var(--red); }
+        .pairing-target { margin-top: 4px; color: var(--text-2); font: 600 11px/1.4 'SF Mono', Menlo, Consolas, monospace; }
+        .pairing-steps { padding: 24px; border-radius: 24px; background: var(--card); border: 1px solid var(--border); }
+        .pairing-steps h2 { font-size: 20px; margin-bottom: 20px; }
+        .step { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 12px 0; }
+        .step-num { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--card-up); color: var(--text); font-size: 12px; font-weight: 800; }
+        .step strong { display: block; font-size: 14px; margin: 2px 0 4px; }
+        .step p { color: var(--text-2); font-size: 13px; line-height: 1.45; }
+        .network-label { display: block; margin: 20px 0 8px; color: var(--text-2); font-size: 12px; font-weight: 700; }
+        .network-select { width: 100%; min-height: 46px; padding: 0 38px 0 13px; border-radius: 12px; border: 1px solid var(--border); background: var(--card-up); color: var(--text); font: 600 13px/1 inherit; }
+        .pairing-actions { display: flex; gap: 10px; margin-top: 12px; }
+        .pairing-btn { min-height: 48px; flex: 1; padding: 0 16px; border-radius: 14px; border: 1px solid var(--border-hl); background: var(--card-up); color: var(--text); font: 750 13px/1 inherit; cursor: pointer; }
+        .pairing-btn.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+        .pairing-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .device-section { margin-top: 18px; padding: 22px; border-radius: 20px; border: 1px solid var(--border); }
+        .device-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+        .device-head h2 { font-size: 16px; }
+        .device-list { display: flex; flex-direction: column; }
+        .device-row { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--border); }
+        .device-row:first-child { border-top: 0; }
+        .device-name { font-size: 13px; font-weight: 700; }
+        .device-date { color: var(--text-3); font-size: 11px; }
+        .device-empty { color: var(--text-2); font-size: 13px; line-height: 1.5; padding: 8px 0; }
+        .revoke-btn { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border-hl); background: transparent; color: var(--text-2); font: 700 12px/1 inherit; cursor: pointer; }
+        .back-btn:disabled { opacity: 0; pointer-events: none; }
+        @media (max-width: 720px) {
+            .pairing-head h1 { font-size: 30px; }
+            .pairing-layout { grid-template-columns: 1fr; }
+            .qr-stage { min-height: 370px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar pairing-topbar">
+        <button class="back-btn" id="pairBack" type="button" aria-label="Back to controller">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="logo">PAIR DEVICES</span>
+    </header>
+
+    <main class="pairing-page">
+        <div class="pairing-head">
+            <div class="required-note" id="requiredNote">Required before remote control</div>
+            <h1>Connect your operator phone</h1>
+            <p>Live Assist keeps remote controls locked until you pair them. Scan this one-time code with the phone or tablet that will run the broadcast.</p>
+        </div>
+
+        <div class="pairing-layout">
+            <section class="qr-stage" aria-label="Pairing QR code">
+                <div class="qr-placeholder" id="qrPlaceholder">Generating a secure one-time code…</div>
+                <button class="qr-reveal" id="qrReveal" type="button" aria-label="Reveal the one-time pairing QR code" aria-pressed="false" hidden>
+                    <img id="pairingQr" alt="">
+                    <span class="qr-reveal-label">Click to reveal QR code</span>
+                </button>
+                <div class="pairing-code" id="pairingCode"></div>
+                <div class="pairing-expiry" id="pairingExpiry" role="status" aria-live="polite"></div>
+                <div class="pairing-target" id="pairingTarget"></div>
+            </section>
+
+            <section class="pairing-steps">
+                <h2>Pair in three steps</h2>
+                <div class="step"><span class="step-num">1</span><div><strong>Join the same network</strong><p>Connect the phone to the same WiFi or Windows hotspot as this PC.</p></div></div>
+                <div class="step"><span class="step-num">2</span><div><strong>Scan the QR code</strong><p>Use the phone camera, open the link, and confirm the device name.</p></div></div>
+                <div class="step"><span class="step-num">3</span><div><strong>Open the controller</strong><p>The phone stays paired for future events until you revoke it here.</p></div></div>
+
+                <label class="network-label" for="pairingNetwork">Phone network</label>
+                <select class="network-select" id="pairingNetwork"></select>
+                <div class="pairing-actions">
+                    <button class="pairing-btn" id="newCode" type="button">New code</button>
+                </div>
+            </section>
+        </div>
+
+        <section class="device-section">
+            <div class="device-head"><h2>Paired controllers</h2><button class="revoke-btn" id="revokeAll" type="button">Revoke all</button></div>
+            <div class="device-list" id="deviceList"><div class="device-empty">Waiting for the first controller…</div></div>
+        </section>
+    </main>
+
+    <script>
+    (() => {
+        'use strict';
+        const $ = selector => document.querySelector(selector);
+        const params = new URLSearchParams(location.search);
+        const nextParam = params.get('next') || '/';
+        const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
+        const firstRun = params.get('first') === '1';
+        let expiryTimer = null;
+        let knownDeviceIds = new Set();
+        let initialLoad = true;
+        let redirectScheduled = false;
+
+        $('#pairBack').disabled = firstRun;
+        $('#pairBack').onclick = () => location.href = next;
+
+        function renderDevices(devices) {
+            const list = $('#deviceList');
+            const ids = new Set(devices.map(device => device.id));
+            const newlyPaired = !initialLoad && devices.some(device => !knownDeviceIds.has(device.id));
+            knownDeviceIds = ids;
+            initialLoad = false;
+
+            if (!devices.length) {
+                list.innerHTML = '<div class="device-empty">Waiting for the first controller…</div>';
+                $('#pairBack').disabled = firstRun;
+                return;
+            }
+
+            list.replaceChildren(...devices.map(device => {
+                const row = document.createElement('div');
+                row.className = 'device-row';
+                const info = document.createElement('div');
+                const name = document.createElement('div');
+                name.className = 'device-name';
+                name.textContent = device.name;
+                const date = document.createElement('div');
+                date.className = 'device-date';
+                date.textContent = 'Paired ' + new Date(device.createdAt).toLocaleString();
+                info.append(name, date);
+                row.append(info);
+                return row;
+            }));
+            $('#pairBack').disabled = false;
+            if (newlyPaired || firstRun) {
+                $('#pairingExpiry').className = 'pairing-expiry success';
+                $('#pairingExpiry').textContent = firstRun ? 'Controller paired — opening Live Assist…' : 'Controller paired successfully';
+            }
+            if (firstRun && !redirectScheduled) {
+                redirectScheduled = true;
+                setTimeout(() => location.replace(next), 900);
+            }
+        }
+
+        async function refreshDevices() {
+            try {
+                const response = await operatorFetch('/api/pairing/devices');
+                const result = await response.json();
+                if (response.ok) renderDevices(result.devices || []);
+            } catch (_) { /* operatorFetch owns auth recovery */ }
+        }
+
+        async function loadNetworks() {
+            const response = await operatorFetch('/api/network');
+            const result = await response.json();
+            const select = $('#pairingNetwork');
+            select.replaceChildren(...(result.urls || []).map(network => {
+                const option = document.createElement('option');
+                option.value = network.address;
+                option.textContent = network.name + ' · ' + network.address;
+                return option;
+            }));
+            const options = Array.from(select.options);
+            const preferred = options.find(option => /^(WLAN|Wi-?Fi|Ethernet) ·/i.test(option.textContent)) ||
+                options.find(option => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(option.value));
+            if (preferred) select.value = preferred.value;
+        }
+
+        async function generateCode() {
+            const button = $('#newCode');
+            button.disabled = true;
+            $('#qrPlaceholder').hidden = false;
+            $('#qrReveal').hidden = true;
+            $('#qrReveal').classList.remove('revealed');
+            $('#qrReveal').setAttribute('aria-pressed', 'false');
+            $('#qrReveal').setAttribute('aria-label', 'Reveal the one-time pairing QR code');
+            $('#qrPlaceholder').textContent = 'Generating a secure one-time code…';
+            try {
+                const address = encodeURIComponent($('#pairingNetwork').value || '');
+                const response = await operatorFetch('/api/pairing/bootstrap?address=' + address);
+                const result = await response.json();
+                if (!response.ok || !result.ok) throw new Error(result.error || 'Could not generate pairing code');
+                $('#pairingQr').src = result.qrDataUrl;
+                $('#qrReveal').hidden = false;
+                $('#qrPlaceholder').hidden = true;
+                $('#pairingCode').textContent = result.code.match(/.{1,4}/g).join(' ');
+                $('#pairingTarget').textContent = 'Opens ' + new URL(result.pairingUrl).host;
+                if (expiryTimer) clearInterval(expiryTimer);
+                const tick = () => {
+                    const seconds = Math.max(0, Math.ceil((result.expiresAt - Date.now()) / 1000));
+                    $('#pairingExpiry').className = 'pairing-expiry';
+                    $('#pairingExpiry').textContent = seconds ? 'One-time code · expires in ' + seconds + ' seconds' : 'Code expired — generate a new one';
+                    if (!seconds) clearInterval(expiryTimer);
+                };
+                tick();
+                expiryTimer = setInterval(tick, 1000);
+            } catch (error) {
+                $('#qrPlaceholder').textContent = error.message;
+                $('#pairingExpiry').className = 'pairing-expiry error';
+                $('#pairingExpiry').textContent = 'Check the server connection and try again.';
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        $('#qrReveal').onclick = () => {
+            const revealed = $('#qrReveal').classList.toggle('revealed');
+            $('#qrReveal').setAttribute('aria-pressed', String(revealed));
+            $('#qrReveal').setAttribute('aria-label', revealed
+                ? 'Hide the pairing QR code'
+                : 'Reveal the one-time pairing QR code');
+        };
+        $('#newCode').onclick = generateCode;
+        $('#pairingNetwork').onchange = generateCode;
+        $('#revokeAll').onclick = async () => {
+            if (!confirm('Revoke every paired controller? You will need to pair again before using remote control.')) return;
+            const response = await operatorFetch('/api/pairing/devices', { method: 'DELETE' });
+            if (response.ok) {
+                renderDevices([]);
+                generateCode();
+            }
+        };
+
+        (async () => {
+            try {
+                await loadNetworks();
+                await refreshDevices();
+                await generateCode();
+                setInterval(refreshDevices, 1500);
+            } catch (error) {
+                $('#qrPlaceholder').textContent = error.message;
+            }
+        })();
+    })();
+    </script>
+</body>
+</html>

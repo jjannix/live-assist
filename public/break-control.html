@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#000000">
     <title>Break · Live Assist</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/operator-auth.js?v=2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -61,6 +62,7 @@
         /* ── Slide toggles ── */
         .sl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .sl-toggle {
+            min-height: 44px;
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 14px; border-radius: 12px;
             background: var(--card-up); border: 1px solid var(--border);
@@ -69,13 +71,23 @@
         }
         .sl-toggle.on { color: var(--text); border-color: var(--border-hl); }
         .sl-toggle .pin {
-            width: 22px; height: 22px; border-radius: 11px;
+            min-width: 44px; height: 44px; border-radius: 22px;
             border: 1px solid var(--border); background: transparent;
             color: var(--text-3); display: flex; align-items: center; justify-content: center;
             font-size: 11px; cursor: pointer; margin-left: 8px;
             transition: all 0.15s;
         }
         .sl-toggle .pin.on { background: var(--accent); border-color: var(--accent); color: #000; }
+
+        /* ── Mode toggle active state ── */
+        .chip.active {
+            background: var(--accent); color: #000; border-color: var(--accent);
+        }
+        /* Germany button lights up in flag colours when active. */
+        .chip[data-mode="germany"].active {
+            background: linear-gradient(180deg, #FFCC00, #f0b800);
+            color: #000; border-color: #DD0000;
+        }
 
         /* ── Sponsor row editor ── */
         .sr-row {
@@ -168,6 +180,15 @@
             </div>
         </div>
 
+        <!-- Mode -->
+        <div class="section">
+            <div class="section-title">Screen Mode</div>
+            <div class="panel-grid" style="grid-template-columns:1fr 1fr">
+                <button class="chip" id="modeDefault" data-mode="default">Standard</button>
+                <button class="chip" id="modeGermany" data-mode="germany">🇩🇪 Germany</button>
+            </div>
+        </div>
+
         <!-- Duration -->
         <div class="section">
             <div class="section-title">Halftime length (minutes)</div>
@@ -224,7 +245,7 @@
     (() => {
         'use strict';
         const $ = s => document.querySelector(s);
-        const socket = io();
+        const socket = operatorSocket();
 
         let state = {};
         let typingTimer = null;
@@ -267,6 +288,7 @@
             syncUnlessFocused('#message', s.message || '');
             renderRotation(s.rotation);
             renderAd(s.ad);
+            renderMode(s.mode);
         }
         function syncUnlessFocused(sel, val) {
             const el = $(sel); if (document.activeElement !== el) el.value = val;
@@ -302,7 +324,7 @@
         debounce('#title',    v => patch({ title: v }));
         debounce('#message',  v => patch({ message: v }));
 
-        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', weather: 'Wetter', brand: 'Brand', mercury: 'Quecksilber', flowfield: 'Flowfield', nebel: 'Nebel' };
+        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', weather: 'Wetter', brand: 'Brand', mercury: 'Quecksilber', flowfield: 'Flowfield', nebel: 'Nebel', deutsch: 'Deutschland' };
         let rotation = {};
         function renderRotation(r) {
             rotation = r || {};
@@ -373,6 +395,16 @@
         debounce('#adDwell', v => {
             const ms = parseInt(v, 10);
             if (Number.isFinite(ms)) socket.emit('breakAd', { op: 'dwell', dwellMs: ms * 1000 });
+        });
+
+        function renderMode(mode) {
+            const m = mode || 'default';
+            document.querySelectorAll('[data-mode]').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === m);
+            });
+        }
+        document.querySelectorAll('[data-mode]').forEach(b => {
+            b.onclick = () => { socket.emit('breakMode', b.dataset.mode); toast('Mode: ' + b.textContent.trim(), 'info', 1000); };
         });
 
         function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

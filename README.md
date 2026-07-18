@@ -133,8 +133,9 @@ cp .env.example .env   # then edit .env with your OBS WebSocket password
 node server.js
 ```
 
-Open `http://localhost:3000` on the main PC, or use the network IP printed at
-startup to open it on the controlling phone/tablet.
+Open `http://localhost:3000` on the main PC. To add a controlling phone or
+tablet, follow the dedicated **Pair Devices** screen shown on first launch,
+select the phone's network, and scan the one-time QR code.
 
 ## The surfaces
 
@@ -144,7 +145,9 @@ startup to open it on the controlling phone/tablet.
 | `/break-control.html` | Editor for the halftime deck (score, timer, sponsors, slides) | Operator's phone |
 | `/break.html` | The audience-facing slide deck | **OBS Browser Source** on the beamer |
 | `/config.html` | Live settings editor | Operator's phone or the laptop |
-| `/dashboard.html` | Health & reconnect dashboard | The laptop |
+| `/dashboard.html` | Health and reconnect dashboard | The laptop |
+| `/pairing-control.html` | Required first-run pairing and device management | The laptop |
+| `/pair.html` | One-time QR pairing confirmation | New operator device |
 
 ## Setup
 
@@ -210,8 +213,10 @@ automatically — lower Spotify in Windows → less Spotify in the broadcast.
 
 ## Network access
 
-The server binds to `0.0.0.0:3000`, so any device on the same network can reach
-it. The startup log prints every reachable IPv4 address.
+The server binds to `0.0.0.0:3000`, so devices on the same network can reach
+it. Operator controls require QR pairing; the audience-facing break deck stays
+read-only and available to OBS without pairing. The startup log prints every
+reachable IPv4 address.
 
 | Network | Works? | Notes |
 |---------|--------|-------|
@@ -227,7 +232,8 @@ a dual-band adapter:
 
 1. Laptop stays on Eduroam (5 GHz) for internet and OBS
 2. Laptop broadcasts a personal hotspot (2.4 GHz) for the phone
-3. Phone connects to the hotspot, opens `http://<hotspot-ip>:3000`
+3. Phone connects to the hotspot; on the PC's **Pair Devices** screen, choose
+   the hotspot interface and scan its QR code
 
 Pick the IP matching the hotspot range (usually `192.168.137.x`). If your WiFi
 card can't do simultaneous client + AP, add a cheap USB WiFi dongle for the
@@ -296,12 +302,16 @@ which is active: `VM` (Voicemeeter), `APP` (native), `OFF` (none).
 │   ├── break.html             # Audience-facing slide deck (OBS Browser Source)
 │   ├── config.html            # Settings (live .env editor)
 │   ├── dashboard.html         # Health dashboard
+│   ├── pairing-control.html   # Required pairing + device management
+│   ├── pair.html              # One-time operator pairing confirmation
+│   ├── operator-auth.js       # Operator auth redirect/fetch helpers
 │   ├── app.js                 # Controller client logic
 │   ├── style.css              # Controller + editor + dashboard theme
 │   ├── broadcast.css          # Break-deck (beamer) theme & motion
 │   ├── manifest.json          # PWA manifest
 │   ├── service-worker.js
 │   └── break-ads/             # Uploaded sponsor logos (served statically)
+├── pairing.js                 # One-time codes + persistent operator tokens
 ├── audio/                     # Audio backend abstraction
 │   ├── interface.js           # Base AudioBackend class
 │   ├── conversions.js         # dB ↔ scalar helpers

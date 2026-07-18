@@ -469,6 +469,85 @@
 
             }
 
+        /* ── Slide: deutsch (flowing tricolour silk) ──────── */
+        /* Three woven glowing strands — Schwarz (graphite),   */
+        /* Rot, Gold — drifting like silk in the wind. Pure    */
+        /* black is invisible on the dark stage, so the top    */
+        /* band is a cool graphite that still reads as Schwarz. */
+        .slide.deutsch-slide {
+            padding: 0; overflow: hidden;
+            background: radial-gradient(ellipse at 50% 50%, #0c0e16 0%, #070a12 60%, #03040a 100%);
+        }
+        .deutsch-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+        .deutsch-text {
+            position: relative; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+        }
+        .deutsch-word {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(40px, 5vw, 84px);
+            font-weight: 700; letter-spacing: 0.14em;
+            color: var(--ink-0);
+            text-shadow: 0 4px 40px rgba(0,0,0,0.5);
+        }
+        .deutsch-sub {
+            font-size: clamp(14px, 1.2vw, 18px); font-weight: 600;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--ink-2);
+        }
+
+        /* ── Germany mode ──────────────────────────────────── */
+        /* Subtle palette shift: black-red-gold runs through   */
+        /* accent, glow, and orb colours.                       */
+        body.mode-germany {
+            --accent: #FFCC00;
+            --accent-2: #DD0000;
+            --accent-glow: rgba(255, 204, 0, 0.35);
+            --warm: #DD0000;
+            --warm-glow: rgba(221, 0, 0, 0.4);
+        }
+        /* Tint one orb gold, the other a deep red. */
+        body.mode-germany .orb.a {
+            background: radial-gradient(circle, rgba(255, 204, 0, 0.30) 0%, transparent 65%);
+        }
+        body.mode-germany .orb.b {
+            background: radial-gradient(circle, rgba(221, 0, 0, 0.22) 50%, rgba(0, 0, 0, 0.25) 100%);
+        }
+        /* Subtle flag-stripe glow along the lower-third top edge. */
+        body.mode-germany .lower::before {
+            background: linear-gradient(90deg,
+                #000000 0%, #DD0000 30%, #FFCC00 50%, #DD0000 70%, #000000 100%);
+            opacity: 0.85;
+        }
+        /* Tiny tricolour flag in the top-left brand dot. */
+        body.mode-germany .brand .mark {
+            background: linear-gradient(180deg,
+                #000000 0%, #000000 33%,
+                #DD0000 33%, #DD0000 66%,
+                #FFCC00 66%, #FFCC00 100%);
+            box-shadow: 0 0 18px var(--accent-glow);
+        }
+        /* Clock numeral gets a warm gold bloom instead of purple. */
+        body.mode-germany .clock {
+            text-shadow: 0 0 60px rgba(255, 204, 0, 0.16);
+        }
+        /* Nebel colour fields → drifting black-red-gold haze. */
+        body.mode-germany .nebel-slide { background: #0a0a0e; }
+        body.mode-germany .nebel-blob:nth-child(1) {
+            background: radial-gradient(circle at 45% 50%, rgba(221,0,0,0.45) 0%, rgba(221,0,0,0) 65%);
+        }
+        body.mode-germany .nebel-blob:nth-child(2) {
+            background: radial-gradient(circle at 55% 45%, rgba(255,204,0,0.38) 0%, rgba(255,204,0,0) 65%);
+        }
+        body.mode-germany .nebel-blob:nth-child(3) {
+            background: radial-gradient(circle at 50% 40%, rgba(221,0,0,0.35) 0%, rgba(221,0,0,0) 65%);
+        }
+        body.mode-germany .nebel-blob:nth-child(4) {
+            background: radial-gradient(circle at 40% 55%, rgba(255,204,0,0.30) 0%, rgba(255,204,0,0) 65%);
+        }
+        body.mode-germany .nebel-blob:nth-child(5) {
+            background: radial-gradient(circle at 55% 50%, rgba(180,0,0,0.30) 0%, rgba(180,0,0,0) 65%);
+        }
+
     </style>
 </head>
 <body>
@@ -606,6 +685,15 @@
                 </div>
             </section>
 
+            <!-- 11. Deutsch (flowing tricolour silk) -->
+            <section class="slide deutsch-slide" data-slide="deutsch">
+                <canvas class="deutsch-canvas" id="deutschCanvas"></canvas>
+                <div class="deutsch-text">
+                    <div class="deutsch-word">DEUTSCHLAND</div>
+                    <div class="deutsch-sub">Live Assist</div>
+                </div>
+            </section>
+
         </div>
 
         <!-- Persistent lower-third -->
@@ -643,6 +731,7 @@
         let state = {};
         let lastState = null;
         let activeSlide = null;
+        let germanyMode = false;
 
         function pad(n) { return String(n).padStart(2, '0'); }
         function fmt(sec) {
@@ -684,6 +773,10 @@
         // ── Full state render ──
         function render(s) {
             state = s;
+            // Apply visual mode (Germany theme etc.)
+            germanyMode = s.mode === 'germany';
+            document.body.classList.toggle('mode-germany', germanyMode);
+
             // Title + message
             $('#title').textContent = (s.title || 'HALBZEIT').toUpperCase();
             const msg = s.message || '';
@@ -868,6 +961,7 @@
             else stopWeatherCanvas();
             if (name === 'mercury') startMercury(); else stopMercury();
             if (name === 'nebel') startNebel(); else stopNebel();
+            if (name === 'deutsch') startDeutsch(); else stopDeutsch();
         }
 
         // ── Weather (atmospheric slide) ────────────────────────────
@@ -1125,6 +1219,64 @@
         function startNebel() {}
         function stopNebel() {}
 
+        // ── Deutsch (flowing tricolour silk) ─────────────────────
+        // Three woven strands — graphite (Schwarz), Rot, Gold —
+        // each a sine-distorted path drawn twice: a wide soft
+        // glow pass + a crisp bright core. The strands drift at
+        // different speeds/phases so they weave around each other
+        // like silk in the wind. rAF only while the slide is live.
+        let dRaf = null;
+        function startDeutsch() {
+            const cv = $('#deutschCanvas');
+            if (!cv) return;
+            const ctx = cv.getContext('2d');
+            const resize = () => { cv.width = cv.offsetWidth; cv.height = cv.offsetHeight; };
+            resize();
+            // y = relative band centre; amp = wave height; sp = drift
+            // speed; ph = phase offset so the bands stay offset.
+            const strands = [
+                { stroke: '#3a3a46', glow: 'rgba(130,130,150,0.45)', y: 0.32, amp: 0.075, sp: 0.55, ph: 0.0, lw: 28 }, // Schwarz → graphite
+                { stroke: '#DD0000', glow: 'rgba(221,0,0,0.60)',    y: 0.50, amp: 0.095, sp: 0.45, ph: 1.8, lw: 32 }, // Rot
+                { stroke: '#FFCC00', glow: 'rgba(255,204,0,0.55)',  y: 0.68, amp: 0.085, sp: 0.50, ph: 3.4, lw: 28 }, // Gold
+            ];
+            let t0 = performance.now();
+            const draw = () => {
+                const t = (performance.now() - t0) / 1000;
+                const W = cv.width, H = cv.height;
+                ctx.clearRect(0, 0, W, H);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                for (const s of strands) {
+                    ctx.beginPath();
+                    const steps = 90;
+                    for (let i = 0; i <= steps; i++) {
+                        const x = (i / steps) * W;
+                        const yy = (s.y
+                            + Math.sin(x * 0.0055 + t * s.sp + s.ph) * s.amp
+                            + Math.sin(x * 0.012 - t * s.sp * 0.7 + s.ph) * s.amp * 0.35) * H;
+                        if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+                    }
+                    // Wide soft glow halo
+                    ctx.shadowBlur = 42;
+                    ctx.shadowColor = s.glow;
+                    ctx.strokeStyle = s.stroke;
+                    ctx.globalAlpha = 0.55;
+                    ctx.lineWidth = s.lw;
+                    ctx.stroke();
+                    // Crisp bright core (no shadow)
+                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 0.95;
+                    ctx.lineWidth = s.lw * 0.42;
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+                dRaf = requestAnimationFrame(draw);
+            };
+            stopDeutsch();
+            dRaf = requestAnimationFrame(draw);
+        }
+        function stopDeutsch() { if (dRaf) { cancelAnimationFrame(dRaf); dRaf = null; } }
+
         // ── Flowfield (generative particle art) ───────────────────
         let fParticles = null, fRaf = null;
         function startFlow() {
@@ -1157,7 +1309,9 @@
                     if (p.y < 0) p.y = cv.height; if (p.y > cv.height) p.y = 0;
                     // Hue drifts across the field so the composition is alive
                     const hue = (p.life * 0.3 + t * 30) % 360;
-                    ctx.fillStyle = 'hsla(' + (250 + (p.life * 0.5) % 80) + ',90%,65%,0.5)';
+                    // Red→gold particles in Germany mode, purple drift otherwise.
+                    const hueBase = germanyMode ? ((p.life * 0.7) % 50) : (250 + (p.life * 0.5) % 80);
+                    ctx.fillStyle = 'hsla(' + hueBase + ',90%,65%,0.5)';
                     ctx.beginPath(); ctx.arc(p.x, p.y, 1.1, 0, Math.PI * 2); ctx.fill();
                 }
                 fRaf = requestAnimationFrame(draw);

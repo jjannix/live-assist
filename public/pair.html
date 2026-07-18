@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
+    <title>Pair controller · Live Assist</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        body { min-height: 100dvh; height: auto; overflow-y: auto; justify-content: center; }
+        .pair-shell { width: min(100%, 480px); margin: auto; padding: max(28px, var(--safe-t)) 20px max(28px, var(--safe-b)); }
+        .pair-mark { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--card-up); border: 1px solid var(--border-hl); color: var(--accent); margin-bottom: 28px; }
+        .pair-mark svg { width: 24px; height: 24px; }
+        h1 { font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 10px; text-wrap: balance; }
+        .pair-lede { color: var(--text-2); font-size: 15px; line-height: 1.55; margin-bottom: 28px; max-width: 42ch; }
+        .pair-panel { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 18px; }
+        .pair-label { display: block; color: var(--text-2); font-size: 13px; font-weight: 650; margin-bottom: 8px; }
+        .pair-input { margin-bottom: 14px; }
+        .pair-code { font-family: 'SF Mono', Menlo, Consolas, monospace; letter-spacing: 0.14em; text-align: center; color: var(--text); font-size: 16px; padding: 12px; border-radius: 12px; background: var(--card-up); border: 1px solid var(--border); margin-bottom: 14px; }
+        .pair-btn { width: 100%; min-height: 52px; border: 0; border-radius: 16px; background: var(--accent); color: #000; font: 700 15px/1 inherit; cursor: pointer; }
+        .pair-btn:disabled { background: var(--card-up); color: var(--text-3); cursor: wait; }
+        .pair-state { min-height: 22px; margin-top: 14px; color: var(--text-2); font-size: 13px; line-height: 1.45; }
+        .pair-state.error { color: var(--red); }
+        .pair-state.success { color: var(--green); }
+        .pair-help { color: var(--text-3); font-size: 12px; line-height: 1.5; margin-top: 18px; }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+    <main class="pair-shell">
+        <div class="pair-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h1>Pair this controller</h1>
+        <p class="pair-lede" id="lede">Pairing gives this device permission to control OBS, audio, and the break screen.</p>
+
+        <section class="pair-panel" id="pairPanel">
+            <div id="withCode" hidden>
+                <label class="pair-label" for="deviceName">Device name</label>
+                <input class="pair-input" id="deviceName" type="text" maxlength="60" autocomplete="off">
+                <div class="pair-code" id="codePreview" aria-label="Pairing code"></div>
+                <button class="pair-btn" id="pairButton" type="button">Pair this device</button>
+            </div>
+            <div id="withoutCode" hidden>
+                <p class="pair-state error">No pairing code was found.</p>
+                <p class="pair-help">On the broadcast PC, open <strong>Pair Devices</strong> at <code>/pairing-control.html</code>, then scan the QR code shown there.</p>
+            </div>
+            <div class="pair-state" id="pairState" role="status" aria-live="polite"></div>
+        </section>
+    </main>
+
+    <script>
+    (() => {
+        'use strict';
+        const params = new URLSearchParams(location.search);
+        const code = (params.get('code') || '').trim().toUpperCase();
+        const nextParam = params.get('next') || '/';
+        const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
+        const withCode = document.querySelector('#withCode');
+        const withoutCode = document.querySelector('#withoutCode');
+        const state = document.querySelector('#pairState');
+        const button = document.querySelector('#pairButton');
+        const name = document.querySelector('#deviceName');
+
+        const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+        name.value = mobile ? 'Phone controller' : 'Operator browser';
+
+        if (!code) {
+            withoutCode.hidden = false;
+            return;
+        }
+
+        withCode.hidden = false;
+        document.querySelector('#codePreview').textContent = code.match(/.{1,4}/g).join(' ');
+
+        async function claim() {
+            button.disabled = true;
+            button.textContent = 'Pairing…';
+            state.className = 'pair-state';
+            state.textContent = 'Checking the one-time code…';
+            try {
+                const response = await fetch('/api/pairing/claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, deviceName: name.value }),
+                });
+                const result = await response.json();
+                if (!response.ok || !result.ok) throw new Error(result.error || 'Pairing failed');
+                state.className = 'pair-state success';
+                state.textContent = 'Paired as “' + result.device.name + '”. Opening the controller…';
+                button.textContent = 'Paired';
+                setTimeout(() => location.replace(next), 700);
+            } catch (error) {
+                state.className = 'pair-state error';
+                state.textContent = error.message;
+                button.disabled = false;
+                button.textContent = 'Try again';
+            }
+        }
+
+        button.addEventListener('click', claim);
+        name.addEventListener('keydown', event => { if (event.key === 'Enter') claim(); });
+    })();
+    </script>
+</body>
+</html>
