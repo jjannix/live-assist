@@ -657,6 +657,43 @@ input[type="number"]:focus-visible {
     .dock-util-group { gap: 4px; }
 }
 
+/* ── Hover affordances ──
+   One restrained layer for pointer devices only.
+   Lifts come from border/background/shadow so they never fight the
+   scale-on-:active presses already wired into the interactive tokens. */
+@media (hover: hover) {
+    .chip:hover,
+    .util-btn:hover,
+    .mute-btn:hover,
+    .back-btn:hover,
+    .hero-meta-close:hover {
+        border-color: var(--border-hl);
+        background: var(--card-up);
+        color: var(--text);
+    }
+    .hero-meta-close:hover { box-shadow: 0 0 0 1px var(--border-hl); }
+
+    /* Primary action buttons: a quiet accent rise. */
+    .action-btn:hover {
+        border-color: var(--border-hl);
+        background: var(--card-up);
+        color: var(--text);
+    }
+
+    /* Selected chips keep their look — no cue needed beyond the press. */
+
+    /* Clickable rows preview their press. */
+    .url-kv:hover { background: var(--card-up); }
+
+    /* Sliders brighten their track as the cursor approaches. */
+    .fader-bar:hover { border-color: var(--border-hl); }
+    .fader-input:hover::-webkit-slider-thumb { box-shadow: 0 2px 10px rgba(0,0,0,0.55); }
+    .fader-input:hover::-moz-range-thumb { box-shadow: 0 2px 10px rgba(0,0,0,0.55); }
+
+    /* Toggle switch previews the engage. */
+    .switch:hover .track { background: var(--border-hl); }
+}
+
 /* Operator surfaces should become effectively static when the OS requests it. */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {

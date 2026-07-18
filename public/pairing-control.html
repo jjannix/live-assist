@@ -19,8 +19,6 @@
         .pairing-head { padding: 34px 0 26px; }
         .pairing-head h1 { max-width: 680px; font-size: 36px; line-height: 1.08; letter-spacing: -0.035em; text-wrap: balance; }
         .pairing-head p { max-width: 62ch; margin-top: 12px; color: var(--text-2); font-size: 15px; line-height: 1.55; }
-        .required-note { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--amber); font-size: 12px; font-weight: 750; }
-        .required-note::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
         .pairing-layout { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(300px, 1.1fr); gap: 18px; align-items: stretch; }
         .qr-stage { min-height: 410px; padding: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 24px; background: var(--card); border: 1px solid var(--border); }
         .qr-reveal { position: relative; width: min(100%, 300px); aspect-ratio: 1; padding: 0; overflow: hidden; border-radius: 18px; border: 1px solid var(--border-hl); background: #fff; cursor: pointer; }
@@ -55,8 +53,19 @@
         .device-name { font-size: 13px; font-weight: 700; }
         .device-date { color: var(--text-3); font-size: 11px; }
         .device-empty { color: var(--text-2); font-size: 13px; line-height: 1.5; padding: 8px 0; }
-        .revoke-btn { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border-hl); background: transparent; color: var(--text-2); font: 700 12px/1 inherit; cursor: pointer; }
-        .back-btn:disabled { opacity: 0; pointer-events: none; }
+        .revoke-btn { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--border-hl); background: transparent; color: var(--text-2); font: 700 12px/1 inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s; }
+        .device-row .revoke-btn { flex-shrink: 0; color: var(--red); border-color: rgba(239,68,68,0.28); }
+        @media (hover: hover) {
+            .device-row .revoke-btn:hover { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.5); color: #fff; }
+            .revoke-btn:hover { background: var(--card-up); border-color: var(--border-hl); color: var(--text); }
+            .pairing-btn:hover { border-color: var(--border-hl); background: var(--card); color: var(--text); }
+            .pairing-btn.primary:hover { background: #7c4ff0; border-color: #7c4ff0; color: #000; box-shadow: 0 6px 22px rgba(139,92,246,0.32); }
+            .pairing-btn.primary { transition: background 0.15s, box-shadow 0.18s, transform 0.15s; }
+            .qr-reveal:hover { border-color: var(--border-hl); box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
+            .qr-reveal { transition: box-shadow 0.18s ease-out, border-color 0.15s; }
+            .step:hover .step-num { background: var(--accent); color: #000; }
+            .step-num { transition: background 0.15s, color 0.15s; }
+        }
         @media (max-width: 720px) {
             .pairing-head h1 { font-size: 30px; }
             .pairing-layout { grid-template-columns: 1fr; }
@@ -66,15 +75,11 @@
 </head>
 <body>
     <header class="topbar pairing-topbar">
-        <button class="back-btn" id="pairBack" type="button" aria-label="Back to controller">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
         <span class="logo">PAIR DEVICES</span>
     </header>
 
     <main class="pairing-page">
         <div class="pairing-head">
-            <div class="required-note" id="requiredNote">Required before remote control</div>
             <h1>Connect your operator phone</h1>
             <p>Live Assist keeps remote controls locked until you pair them. Scan this one-time code with the phone or tablet that will run the broadcast.</p>
         </div>
@@ -124,8 +129,6 @@
         let initialLoad = true;
         let redirectScheduled = false;
 
-        $('#pairBack').disabled = firstRun;
-        $('#pairBack').onclick = () => location.href = next;
 
         function renderDevices(devices) {
             const list = $('#deviceList');
@@ -136,7 +139,6 @@
 
             if (!devices.length) {
                 list.innerHTML = '<div class="device-empty">Waiting for the first controller…</div>';
-                $('#pairBack').disabled = firstRun;
                 return;
             }
 
@@ -151,10 +153,28 @@
                 date.className = 'device-date';
                 date.textContent = 'Paired ' + new Date(device.createdAt).toLocaleString();
                 info.append(name, date);
-                row.append(info);
+                const revoke = document.createElement('button');
+                revoke.className = 'revoke-btn';
+                revoke.type = 'button';
+                revoke.textContent = 'Revoke';
+                revoke.setAttribute('aria-label', 'Revoke ' + device.name);
+                revoke.onclick = async () => {
+                    if (!confirm('Revoke “' + device.name + '”? That controller will lose access immediately.')) return;
+                    revoke.disabled = true;
+                    try {
+                        const response = await operatorFetch('/api/pairing/devices/' + encodeURIComponent(device.id), { method: 'DELETE' });
+                        const result = await response.json();
+                        if (!response.ok || !result.ok) throw new Error(result.error || 'Could not revoke controller');
+                        renderDevices(result.devices || []);
+                    } catch (error) {
+                        revoke.disabled = false;
+                        $('#pairingExpiry').className = 'pairing-expiry error';
+                        $('#pairingExpiry').textContent = error.message;
+                    }
+                };
+                row.append(info, revoke);
                 return row;
             }));
-            $('#pairBack').disabled = false;
             if (newlyPaired || firstRun) {
                 $('#pairingExpiry').className = 'pairing-expiry success';
                 $('#pairingExpiry').textContent = firstRun ? 'Controller paired — opening Live Assist…' : 'Controller paired successfully';

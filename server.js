@@ -342,6 +342,20 @@ app.get('/api/pairing/devices', requireOperator, (req, res) => {
     res.json({ ok: true, devices: pairing.listDevices() });
 });
 
+app.delete('/api/pairing/devices/:id', requireOperator, (req, res) => {
+    const revoked = pairing.revokeDevice(String(req.params.id || ''));
+    if (!revoked) return res.status(404).json({ ok: false, error: 'Paired controller not found.' });
+    for (const socket of io.sockets.sockets.values()) {
+        if (socket.data.operatorDeviceId === revoked.id) {
+            socket.emit('authState', { operator: false });
+            socket.disconnect(true);
+        }
+    }
+    const devices = pairing.listDevices();
+    emitOperators('pairingChanged', { devices });
+    res.json({ ok: true, revoked, devices });
+});
+
 app.delete('/api/pairing/devices', requireOperator, (req, res) => {
     pairing.revokeAll();
     for (const socket of io.sockets.sockets.values()) {
@@ -473,8 +487,10 @@ startWeather();
 
 io.on('connection', async socket => {
     const localOperator = isLoopback(socket.handshake.address);
-    const operator = localOperator || pairing.verify(cookieValue(socket.request.headers.cookie, OPERATOR_COOKIE));
+    const pairedDevice = pairing.findDevice(cookieValue(socket.request.headers.cookie, OPERATOR_COOKIE));
+    const operator = localOperator || !!pairedDevice;
     socket.data.localOperator = localOperator;
+    socket.data.operatorDeviceId = pairedDevice && pairedDevice.id;
     socket.data.operator = operator;
     socket.emit('authState', { operator, localOperator, pairedDevices: pairing.listDevices().length });
 

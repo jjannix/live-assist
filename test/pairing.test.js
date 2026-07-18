@@ -26,6 +26,24 @@ test('one-time pairing code issues a persistent verifiable token', () => {
     }
 });
 
+test('one controller can be revoked without affecting others', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'live-assist-pairing-'));
+    const file = path.join(dir, 'operator-pairing.json');
+    try {
+        const manager = new PairingManager(file);
+        const phone = manager.claim(manager.createCode().code, 'Phone');
+        const tablet = manager.claim(manager.createCode().code, 'Tablet');
+
+        assert.equal(manager.findDevice(phone.token).id, phone.device.id);
+        assert.equal(manager.revokeDevice(phone.device.id).name, 'Phone');
+        assert.equal(manager.verify(phone.token), false);
+        assert.equal(manager.verify(tablet.token), true);
+        assert.deepEqual(manager.listDevices().map(device => device.name), ['Tablet']);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
 test('revokeAll invalidates every paired token', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'live-assist-pairing-'));
     const file = path.join(dir, 'operator-pairing.json');

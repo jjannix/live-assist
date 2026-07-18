@@ -80,10 +80,23 @@ class PairingManager {
         return { token, device: this.publicDevice(device) };
     }
 
-    verify(token) {
-        if (typeof token !== 'string' || token.length < 32) return false;
+    findDevice(token) {
+        if (typeof token !== 'string' || token.length < 32) return null;
         const candidate = hashToken(token);
-        return this.devices.some(device => safeEqualHex(candidate, device.tokenHash));
+        const device = this.devices.find(item => safeEqualHex(candidate, item.tokenHash));
+        return device ? this.publicDevice(device) : null;
+    }
+
+    verify(token) {
+        return !!this.findDevice(token);
+    }
+
+    revokeDevice(id) {
+        const index = this.devices.findIndex(device => device.id === id);
+        if (index < 0) return null;
+        const [device] = this.devices.splice(index, 1);
+        this._persist();
+        return this.publicDevice(device);
     }
 
     revokeAll() {
