@@ -43,6 +43,7 @@ the beamer during breaks. It crossfades through any combination of:
 | **clock** | Big numeral halftime countdown |
 | **radial** | Countdown as a depleting ring |
 | **score** | Editorial scoreboard split (home / away) |
+| **stats** | Live match statistics — possession, shots, corners, fouls, cards from API-Football (optional; break-only polling) |
 | **message** | Full-screen pushed announcement |
 | **ad** | Rotating sponsor bumpers (logo, name, tagline, QR) |
 | **weather** | Live local conditions + 6-hour forecast strip (Open-Meteo, no API key) |
@@ -264,6 +265,69 @@ the annotated reference.
 | `STADIUM_NAME` | — | Label on the weather slide (city / ground) |
 | `STADIUM_LAT` | `49.318` | Latitude for the weather poll (decimal degrees) |
 | `STADIUM_LON` | `7.344` | Longitude for the weather poll |
+| `API_FOOTBALL_ENABLED` | `false` | Live-match-data master switch; enable after adding a key |
+| `API_FOOTBALL_KEY` | — | API-Sports v3 key. Server-side only; never sent to browsers or logs |
+| `API_FOOTBALL_LEAGUE` | `1` | API-Sports league id (`1` = FIFA World Cup) |
+| `API_FOOTBALL_SEASON` | `2026` | Season year for the league above |
+
+## Live match data (API-Football, optional)
+
+The halftime deck can show a **live score + match-statistics slide** during a
+break, fed by [API-Football](https://www.api-football.com/) (API-Sports v3).
+It's entirely optional — without a key the deck works exactly as before.
+
+### How it spends your quota
+
+The free plan is **100 requests/day**. Euro Studio is built around that limit:
+
+- **No background polling.** Pressing **Break** captures one match snapshot;
+  no further automatic calls happen during halftime.
+- **One request normally** because fixture details embed score, statistics,
+  lineups, events and player ratings. If embedded statistics are unavailable,
+  activation may use one fallback statistics request (two calls total).
+- **Server-side caching + deduplication**, so two controllers tapping
+  "Refresh" at the same time, or multiple audience devices, cost a single
+  call — not one per device.
+- Discovery ("load fixtures for a date") is cached for a minute.
+
+That is **1 request per halftime normally, or at most 2** with the fallback.
+The operator can deliberately spend another 1–2 using **Sync now**.
+
+### Setup
+
+1. Create a free account at **https://api-sports.io** and copy your API key
+   from the dashboard.
+2. Open **Settings** (`/config.html`) → *Live match data (API-Football)*,
+   turn on **Enable live match data**, paste the key into
+   **API-Football key**, and **Save**.
+3. On match day open the **Break editor** (`/break-control.html`) →
+   *Live match data*, pick today's date, tap **Load**, then tap the fixture.
+4. When you hit **Break**, the deck captures one snapshot and makes no further
+   automatic calls during halftime. The insight slides show score, statistics,
+   lineups, events, goals and top player performances when available.
+
+The API key lives only in `.env` on the server. It is **never** sent to a
+browser, written into `break-state.json`, printed in the activity log, or
+included in a Socket.IO payload. The operator UI only ever sees a boolean
+`hasKey`.
+
+### Manual override is always authoritative
+
+Editing the score, team names, or match clock by hand sets a **manual
+override** — the live feed will not overwrite your values until you tap
+**Apply live**. If the API or your internet goes down, the last good score
+and stats stay on screen; a failure never blanks valid data.
+
+> ### ⚠️ Public-display / broadcast rights
+> API-Sports grants **data access**, not publication or broadcast rights.
+> Team names, competition names, scores and statistics may be subject to
+> licensing or rights-holder restrictions in your country. If you show this
+> slide in a public or commercial setting (a viewing party, a venue beamer,
+> a stream), **you are responsible for obtaining any required authorisation**
+> from the relevant rights holders. The slide intentionally uses no FIFA,
+> competition or team logos.
+
+
 
 ## Audio backends
 
@@ -290,6 +354,7 @@ which is active: `VM` (Voicemeeter), `APP` (native), `OFF` (none).
 ├── config.js                  # Live .env reader/writer (backs /config.html)
 ├── break-state.js             # Source of truth for the halftime deck (persisted)
 ├── weather-state.js           # Open-Meteo poller → feeds the weather slide
+├── football-state.js          # API-Football v3 client → one snapshot per break activation
 ├── package.json
 ├── start.bat                  # Windows launcher (git pull, OBS, VM, server)
 ├── dev.cmd                    # Run a command under the x64 Node

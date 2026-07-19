@@ -176,6 +176,33 @@ so one person can run a clean halftime transition with a single tap.
 
 ---
 
+## Step 7 — (Optional) Live match data (API-Football)
+
+Want the halftime deck to show a **live score + statistics slide**? This is
+optional — skip it and the deck works exactly as before.
+
+1. Create a free account at **https://api-sports.io** and copy your API key
+   (free plan = **100 requests/day**).
+2. In the controller: **⚙️ Settings → Live match data (API-Football)** →
+   turn on **Enable live match data**, paste the key into
+   **API-Football key** → **Save**.
+3. On match day: **Break editor → Live match data** → pick today's date →
+   **Load** → tap the fixture.
+4. Tap **Break** when halftime starts. The deck syncs once immediately, then
+   refreshes about once a **minute** (only while a break is on screen).
+5. Toggle the **stats** slide on under *Slides*.
+
+> 💡 The free plan is generous for a single match: at the default 60 s
+> interval you'll use roughly **2–3 requests per halftime**. Polling stops
+> the moment you hit **Game On**.
+>
+> ⚠️ **Broadcast rights:** API-Sports provides the *data*, not permission to
+> publish it. Showing scores/stats publicly (a venue beamer, a stream) may
+> need rights-holder authorisation in your country. The slide uses no team,
+> competition or FIFA logos.
+
+---
+
 ## Troubleshooting
 
 ### OBS dot is red, scenes don't switch
@@ -208,6 +235,20 @@ Health (top bar) for live status, and check that window's output.
 ### I want to start fresh
 Re-run the installer command from Step 1 — it updates the existing install
 in place without losing your `.env`.
+
+### Live-match / stats slide shows nothing or an error
+The live-match feature only talks to API-Football **while a break is on the
+beamer** — there's no polling during the match. If the **stats** slide is
+empty:
+- Check the **Break editor → Live match data** banner. *No API key* → add it
+  in Settings. *Auth failed* → the key is wrong/expired. *Rate limited* →
+  you've spent today's 100 free requests (resets at midnight UTC).
+- Make sure a **fixture is selected** (tap one in the list) and **Sync now**
+  succeeds. The banner turns green when a snapshot is held.
+- No internet on the broadcast PC? The last good score and stats stay on
+  screen; nothing is erased. Fix the connection and tap **Sync now**.
+- Edited the score by hand? That sets a **manual override** — live data won't
+  overwrite it until you tap **Apply live**.
 
 ---
 

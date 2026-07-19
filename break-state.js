@@ -44,8 +44,8 @@ const DEFAULTS = Object.freeze({
     rotation: {
         // The slides you've curated as the core deck. The others are
         // opt-in from the Slides (rotation) panel in the operator page.
-        slides: ['clock', 'radial', 'score', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield', 'nebel', 'deutsch'],
-        active: { clock: true, radial: true, score: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true, nebel: true, deutsch: true },
+        slides: ['clock', 'radial', 'score', 'stats', 'stats_shots', 'stats_radar', 'stats_control', 'lineup_home', 'lineup_away', 'timeline', 'goals', 'performers', 'message', 'ad', 'weather', 'brand', 'mercury', 'flowfield', 'nebel', 'deutsch'],
+        active: { clock: true, radial: true, score: true, stats: true, stats_shots: true, stats_radar: true, stats_control: true, lineup_home: true, lineup_away: true, timeline: true, goals: true, performers: true, message: true, ad: true, weather: true, brand: true, mercury: true, flowfield: true, nebel: true, deutsch: true },
         dwellMs: 12000,
         pinned: null,
     },
@@ -64,6 +64,27 @@ const DEFAULTS = Object.freeze({
     // Subtly changes the colour palette (accent, glow, orbs) so
     // the operator can give halftime a national touch.
     mode: 'default',
+
+    // Live match data from API-Football (football-state.js). All
+    // fields here are NON-SECRET: the API key never appears in this
+    // object, the Socket.IO payload, or the persisted JSON. The
+    // snapshot is a normalised, Euro Studio-owned view (plain team
+    // names + numbers + a status summary) — provider schemas don't
+    // leak through. See football-state.js for the fetch/normalise
+    // logic and the quota-conscious break-only polling strategy.
+    liveMatch: {
+        enabled: true,              // operator runtime on/off
+        selectedFixtureId: null,    // the operator's picked fixture
+        manualOverride: false,      // when true, manual edits win over live
+        snapshot: null,             // last-good normalised provider snapshot
+        sync: {
+            lastUpdated: null,      // epoch ms of last successful fetch
+            lastAttempt: null,      // epoch ms of last attempt (incl. failed)
+            lastError: null,        // classified error string (non-secret)
+            remaining: null,        // provider quota remaining, if exposed
+            source: null,           // 'fixture' | 'fixture+statistics'
+        },
+    },
 
     // (No additional state — only the 7 curated slides remain.)
     // Live local weather for the "weather" slide. Populated by the
@@ -101,6 +122,7 @@ function load() {
         const merged = merge(structuredClone(DEFAULTS), parsed);
         reconcileSlides(merged);
         reconcileAd(merged);
+        reconcileLiveMatch(merged);
         return merged;
     } catch (_) {
         return structuredClone(DEFAULTS);
@@ -213,8 +235,10 @@ function update(partial) {
     if (partial.home) patchTeam(state.home, partial.home);
     if (partial.away) patchTeam(state.away, partial.away);
     if (partial.matchClock) {
-        if (typeof partial.matchClock.label === 'string')   state.matchClock.label = partial.matchClock.label.slice(0, 8);
-        if (typeof partial.matchClock.display === 'string') state.matchClock.display = partial.matchClock.display.slice(0, 12);
+        let edited = false;
+        if (typeof partial.matchClock.label === 'string')   { state.matchClock.label = partial.matchClock.label.slice(0, 8); edited = true; }
+        if (typeof partial.matchClock.display === 'string') { state.matchClock.display = partial.matchClock.display.slice(0, 12); edited = true; }
+        if (edited && state.liveMatch && state.liveMatch.selectedFixtureId) state.liveMatch.manualOverride = true;
     }
     commit();
 }
@@ -222,11 +246,19 @@ function update(partial) {
 function patchTeam(team, patch) {
     if (typeof patch.name === 'string')  team.name = patch.name.slice(0, 24);
     if (Number.isFinite(patch.score))    team.score = Math.max(0, Math.min(99, Math.trunc(patch.score)));
+    // Manual score/name edits are an explicit override: if a live
+    // fixture is selected, the operator's hand-typed values win until
+    // they hit "Resync from live". This guarantees an API failure or
+    // stale snapshot can never blank or corrupt a valid manual score.
+    if (state.liveMatch && state.liveMatch.selectedFixtureId) {
+        state.liveMatch.manualOverride = true;
+    }
 }
 
 function setScore(side, delta) {
     if (side !== 'home' && side !== 'away') return;
     state[side].score = Math.max(0, Math.min(99, state[side].score + (delta > 0 ? 1 : -1)));
+    if (state.liveMatch && state.liveMatch.selectedFixtureId) state.liveMatch.manualOverride = true;
     commit();
 }
 
@@ -342,6 +374,110 @@ function setAd(patch) {
     updateSponsor(0, patch);
 }
 
+// Forward-compat for liveMatch: ensure the section + its nested sync
+// object exist with the default shape on an older persisted file.
+function reconcileLiveMatch(s) {
+    if (!s.liveMatch || typeof s.liveMatch !== 'object') s.liveMatch = structuredClone(DEFAULTS.liveMatch);
+    if (!s.liveMatch.sync || typeof s.liveMatch.sync !== 'object') s.liveMatch.sync = structuredClone(DEFAULTS.liveMatch.sync);
+    // Redact defensively: if a key ever slipped in (it never should),
+    // drop it on load so it can't be re-persisted or broadcast.
+    delete s.liveMatch.apiKey;
+    delete s.liveMatch.key;
+}
+
+/** Read-only view of the live-match block (no secrets here). */
+function getLiveMatch() {
+    return structuredClone(state.liveMatch);
+}
+
+/**
+ * Merge a (validated, sanitised) patch into state.liveMatch. Only
+ * known keys are honoured; nested sync is deep-merged. Never accepts
+ * a key — that lives only in process.env, never in state.
+ */
+function setLiveMatch(patch) {
+    if (!patch || typeof patch !== 'object') return;
+    const lm = state.liveMatch;
+    if (typeof patch.enabled === 'boolean') lm.enabled = patch.enabled;
+    if (patch.selectedFixtureId === null || Number.isInteger(patch.selectedFixtureId)) {
+        lm.selectedFixtureId = patch.selectedFixtureId;
+    }
+    if (typeof patch.manualOverride === 'boolean') lm.manualOverride = patch.manualOverride;
+    if (patch.snapshot === null || (patch.snapshot && typeof patch.snapshot === 'object')) {
+        lm.snapshot = patch.snapshot === null ? null : sanitizeSnapshot(patch.snapshot);
+    }
+    if (patch.sync && typeof patch.sync === 'object') {
+        const s = lm.sync;
+        if (patch.sync.lastUpdated === null || Number.isFinite(patch.sync.lastUpdated)) s.lastUpdated = patch.sync.lastUpdated;
+        if (patch.sync.lastAttempt === null || Number.isFinite(patch.sync.lastAttempt)) s.lastAttempt = patch.sync.lastAttempt;
+        if (typeof patch.sync.lastError === 'string') s.lastError = patch.sync.lastError.slice(0, 40);
+        else if (patch.sync.lastError === null) s.lastError = null;
+        if (patch.sync.remaining === null || Number.isFinite(patch.sync.remaining)) s.remaining = patch.sync.remaining;
+        if (typeof patch.sync.source === 'string') s.source = patch.sync.source.slice(0, 30);
+        else if (patch.sync.source === null) s.source = null;
+    }
+    commit();
+}
+
+// Strip any unexpected keys before a snapshot is stored, so a future
+// provider schema change can't smuggle unrelated fields into state.
+function sanitizeSnapshot(snap) {
+    if (!snap || typeof snap !== 'object') return null;
+    const pick = (o, keys) => {
+        const out = {};
+        for (const k of keys) if (o[k] !== undefined) out[k] = o[k];
+        return out;
+    };
+    const out = pick(snap, ['fixtureId', 'competition', 'home', 'away', 'status', 'clock', 'stats', 'kickoff', 'updatedAt']);
+    if (snap.home) out.home = pick(snap.home, ['name', 'score']);
+    if (snap.away) out.away = pick(snap.away, ['name', 'score']);
+    if (snap.status) out.status = pick(snap.status, ['code', 'label', 'short', 'elapsed', 'live', 'finished']);
+    if (snap.clock) out.clock = pick(snap.clock, ['label', 'display']);
+    if (snap.stats && typeof snap.stats === 'object') {
+        out.stats = {};
+        for (const k of Object.keys(snap.stats)) {
+            const v = snap.stats[k];
+            if (v && typeof v === 'object') out.stats[k] = pick(v, ['home', 'away']);
+        }
+    }
+    if (snap.lineups && typeof snap.lineups === 'object') {
+        out.lineups = {};
+        for (const side of ['home', 'away']) {
+            const lineup = snap.lineups[side];
+            if (!lineup || typeof lineup !== 'object') { out.lineups[side] = null; continue; }
+            out.lineups[side] = pick(lineup, ['formation', 'coach']);
+            out.lineups[side].startXI = (Array.isArray(lineup.startXI) ? lineup.startXI : []).slice(0, 11).map(p => pick(p || {}, ['name', 'number', 'position', 'grid']));
+            out.lineups[side].substitutes = (Array.isArray(lineup.substitutes) ? lineup.substitutes : []).slice(0, 15).map(p => pick(p || {}, ['name', 'number', 'position']));
+        }
+    }
+    out.events = (Array.isArray(snap.events) ? snap.events : []).slice(0, 100).map(e => pick(e || {}, ['minute', 'extra', 'side', 'type', 'detail', 'player', 'assist']));
+    out.topPlayers = (Array.isArray(snap.topPlayers) ? snap.topPlayers : []).slice(0, 3).map(p => pick(p || {}, ['name', 'side', 'number', 'position', 'rating', 'minutes', 'goals', 'assists', 'shots', 'shotsOn', 'keyPasses', 'tackles', 'interceptions', 'duelsWon', 'saves']));
+    return out;
+}
+
+/**
+ * Apply the last live snapshot to the displayed score / teams / clock
+ * — UNLESS manualOverride is set, in which case the operator's hand-
+ * typed values are kept untouched. Called after every successful sync
+ * and on explicit "Resync from live". A missing/empty snapshot is a
+ * no-op so the manual state is never clobbered by a failed fetch.
+ */
+function applyLiveMatchSnapshot() {
+    const lm = state.liveMatch;
+    if (!lm || lm.manualOverride) return;
+    const snap = lm.snapshot;
+    if (!snap) return;
+    if (snap.home && typeof snap.home.name === 'string') state.home.name = snap.home.name.slice(0, 24);
+    if (snap.away && typeof snap.away.name === 'string') state.away.name = snap.away.name.slice(0, 24);
+    if (snap.home && Number.isFinite(snap.home.score)) state.home.score = Math.max(0, Math.min(99, Math.trunc(snap.home.score)));
+    if (snap.away && Number.isFinite(snap.away.score)) state.away.score = Math.max(0, Math.min(99, Math.trunc(snap.away.score)));
+    if (snap.clock) {
+        if (typeof snap.clock.label === 'string')   state.matchClock.label = snap.clock.label.slice(0, 8);
+        if (typeof snap.clock.display === 'string') state.matchClock.display = snap.clock.display.slice(0, 12);
+    }
+    commit();
+}
+
 /** Merge a weather snapshot from the poller into state.weather. */
 function setWeather(patch) {
     if (!patch || typeof patch !== 'object') return;
@@ -370,6 +506,7 @@ module.exports = {
     setRotation, setAd,
     addSponsor, updateSponsor, removeSponsor, setSponsorLogo, setAdDwell,
     setWeather, setMode,
+    getLiveMatch, setLiveMatch, applyLiveMatchSnapshot,
     subscribe,
     DEFAULTS,
 };

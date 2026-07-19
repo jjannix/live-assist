@@ -163,6 +163,244 @@
         }
         .score-colon { font-size: clamp(48px, 6vw, 96px); font-weight: 500; color: var(--ink-3); }
 
+        /* ── Slide: stats (live match statistics, API-Football) ── */
+        /* An editorial scoreboard + comparison grid. Built only from the
+           normalised, non-secret snapshot. Null/partial stats are omitted
+           client-side so the grid never shows empty placeholders. */
+        .stats-board { display: flex; flex-direction: column; align-items: center; gap: clamp(20px, 2.4vw, 36px); width: 100%; max-width: 1200px; }
+        .stats-head { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+        .stats-eyebrow {
+            font-size: clamp(13px, 1.1vw, 17px); font-weight: 700;
+            letter-spacing: 0.4em; text-transform: uppercase; color: var(--ink-2);
+        }
+        .stats-status {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: clamp(12px, 1vw, 15px); font-weight: 700;
+            letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-1);
+            padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line-2);
+            background: rgba(124, 106, 255, 0.06);
+        }
+        .stats-status .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: breathe 2.6s ease-in-out infinite; }
+        .stats-status.finished { color: var(--warm); border-color: rgba(245,166,35,0.35); background: rgba(245,166,35,0.06); }
+        .stats-status.finished .live-dot { background: var(--warm); box-shadow: 0 0 10px var(--warm-glow); }
+        .stats-row {
+            display: flex; align-items: center; gap: clamp(24px, 3.4vw, 56px);
+            font-family: var(--font-display);
+        }
+        .stats-team { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+        .stats-team .nm {
+            font-size: clamp(18px, 1.9vw, 30px); font-weight: 600;
+            color: var(--ink-0); text-transform: uppercase; letter-spacing: 0.04em;
+            max-width: 9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .stats-team .gl { font-size: clamp(48px, 6vw, 92px); font-weight: 700; color: var(--ink-0); font-variant-numeric: tabular-nums; line-height: 1; }
+        .stats-vs { font-size: clamp(28px, 3vw, 48px); font-weight: 500; color: var(--ink-3); }
+
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr; gap: clamp(10px, 1.1vw, 16px);
+            width: 100%; max-width: 980px;
+        }
+        .stat-line { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: clamp(16px, 2vw, 28px); }
+        .stat-line .sv { font-size: clamp(20px, 2vw, 32px); font-weight: 700; color: var(--ink-0); font-variant-numeric: tabular-nums; }
+        .stat-line .sv.home { text-align: right; }
+        .stat-line .sv.away { text-align: left; }
+        .stat-line .sv.lead { color: var(--accent); }
+        .stat-line .sl-label {
+            font-size: clamp(11px, 0.95vw, 14px); font-weight: 700;
+            letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-2);
+            text-align: center; white-space: nowrap;
+        }
+        /* Possession + pass-accuracy get a proportional comparison bar. */
+        .stat-bar {
+            display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: clamp(14px, 1.8vw, 24px);
+        }
+        .stat-bar .sb-track { grid-column: 1 / -1; display: flex; height: 8px; border-radius: 6px; overflow: hidden; background: var(--line); }
+        .stat-bar .sb-fill-home { background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); }
+        .stat-bar .sb-fill-away { background: linear-gradient(90deg, var(--accent-2), var(--accent)); transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); opacity: 0.6; }
+        .stats-empty { font-size: clamp(18px, 1.8vw, 26px); font-weight: 600; color: var(--ink-2); font-style: italic; }
+
+        /* ── Slides: focused match insights ── */
+        .insight-board {
+            display: flex; flex-direction: column; width: 100%; max-width: 1220px;
+            gap: clamp(22px, 2.6vw, 38px); text-align: left;
+        }
+        .insight-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 32px; }
+        .insight-team { min-width: 0; }
+        .insight-team.away { text-align: right; }
+        .insight-team-name {
+            display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            font-family: var(--font-display); font-size: clamp(24px, 2.4vw, 38px);
+            font-weight: 700; color: var(--ink-0); text-transform: uppercase;
+        }
+        .insight-team-side {
+            display: block; margin-top: 6px; font-size: clamp(10px, 0.9vw, 13px);
+            font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; color: var(--ink-3);
+        }
+        .insight-heading { text-align: center; }
+        .insight-kicker {
+            font-size: clamp(11px, 0.95vw, 14px); font-weight: 700;
+            letter-spacing: 0.34em; text-transform: uppercase; color: var(--accent);
+        }
+        .insight-title {
+            margin-top: 7px; font-family: var(--font-display); font-size: clamp(28px, 3.2vw, 50px);
+            font-weight: 700; color: var(--ink-0); white-space: nowrap;
+        }
+        .compare-list { display: grid; gap: clamp(14px, 1.65vw, 24px); }
+        .compare-row { display: grid; grid-template-columns: 72px 1fr minmax(150px, 220px) 1fr 72px; align-items: center; gap: clamp(12px, 1.4vw, 22px); }
+        .compare-value {
+            font-family: var(--font-display); font-size: clamp(28px, 3vw, 48px);
+            font-weight: 700; color: var(--ink-1); font-variant-numeric: tabular-nums;
+        }
+        .compare-value.home { text-align: right; }
+        .compare-value.lead { color: var(--accent); }
+        .compare-label {
+            text-align: center; font-size: clamp(11px, 1vw, 15px); font-weight: 700;
+            letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-2);
+        }
+        .compare-track { height: 12px; overflow: hidden; border-radius: 999px; background: var(--line); }
+        .compare-track.home { transform: scaleX(-1); }
+        .compare-fill {
+            width: 100%; height: 100%; border-radius: inherit; transform: scaleX(var(--ratio));
+            transform-origin: left center; animation: insight-grow 700ms cubic-bezier(0.23, 1, 0.32, 1) both;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        }
+        .compare-track.away .compare-fill { opacity: 0.58; }
+        @keyframes insight-grow { from { transform: scaleX(0.02); } }
+
+        .possession-hero { display: grid; gap: 12px; }
+        .possession-values { display: flex; justify-content: space-between; align-items: end; }
+        .possession-value {
+            font-family: var(--font-display); font-size: clamp(52px, 6.5vw, 100px);
+            font-weight: 700; line-height: 0.9; color: var(--ink-0); font-variant-numeric: tabular-nums;
+        }
+        .possession-value.away { color: var(--ink-1); }
+        .possession-label { align-self: center; font-size: clamp(11px, 1vw, 15px); font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-2); }
+        .possession-track { position: relative; display: flex; height: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; background: var(--line); }
+        .possession-track::after { content: ''; position: absolute; top: -4px; bottom: -4px; left: 50%; width: 2px; transform: translateX(-50%); background: rgba(255,255,255,0.7); box-shadow: 0 0 0 2px rgba(8,10,18,0.72); }
+        .possession-home { background: var(--accent); }
+        .possession-away { background: var(--accent-2); }
+        .metric-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(12px, 1.5vw, 22px); }
+        .metric-card { padding: clamp(16px, 1.7vw, 25px); border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
+        .metric-card-label { font-size: clamp(10px, 0.9vw, 13px); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-2); text-align: center; }
+        .metric-card-values { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-top: 10px; }
+        .metric-card-value { font-family: var(--font-display); font-size: clamp(27px, 3vw, 46px); font-weight: 700; color: var(--ink-0); font-variant-numeric: tabular-nums; }
+        .metric-card-value:last-child { text-align: right; }
+        .metric-card-sep { color: var(--ink-3); }
+        .card-mark { display: inline-block; width: 11px; height: 16px; margin-right: 8px; border-radius: 2px; vertical-align: 1px; }
+        .card-mark.yellow { background: #ffd84a; box-shadow: 0 0 12px rgba(255,216,74,0.24); }
+        .card-mark.red { background: #ff4e5b; box-shadow: 0 0 12px rgba(255,78,91,0.24); }
+
+        /* Shot composition: readable totals plus segmented rails for outcome
+           and location. The compact summary replaces the previous dial. */
+        .shot-cards { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(22px, 3vw, 44px); }
+        .shot-card { display: grid; gap: clamp(20px, 2.2vw, 32px); padding: clamp(22px, 2.5vw, 38px); border: 1px solid var(--line); border-radius: 24px; background: var(--panel); }
+        .shot-card-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+        .shot-card-heading { min-width: 0; }
+        .shot-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-size: clamp(22px, 2.2vw, 34px); font-weight: 700; color: var(--ink-0); text-transform: uppercase; }
+        .shot-accuracy { margin-top: 8px; color: var(--ink-2); font-size: clamp(11px, 0.95vw, 14px); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+        .shot-accuracy b { color: var(--accent); font-size: 1.15em; font-variant-numeric: tabular-nums; }
+        .shot-total { flex: 0 0 auto; text-align: right; }
+        .shot-total b { display: block; font-family: var(--font-display); font-size: clamp(46px, 5vw, 76px); font-weight: 700; line-height: 0.82; color: var(--ink-0); font-variant-numeric: tabular-nums; }
+        .shot-total span { display: block; margin-top: 10px; color: var(--ink-3); font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+        .shot-group { display: grid; gap: 8px; }
+        .shot-group-title { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-3); }
+        .shot-segments { display: flex; gap: 3px; height: 12px; overflow: hidden; border-radius: 999px; background: var(--line); }
+        .shot-segment { min-width: 3px; transform-origin: left center; animation: segment-enter 650ms cubic-bezier(0.23,1,0.32,1) both; }
+        .shot-segment.primary { background: var(--accent); }
+        .shot-segment.secondary { background: var(--accent-2); }
+        .shot-segment.muted { background: rgba(255,255,255,0.24); }
+        @keyframes segment-enter { from { transform: scaleX(0.04); opacity: 0.45; } }
+        .shot-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+        .shot-legend-item { font-size: clamp(10px, 0.85vw, 13px); font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+        .shot-legend-item b { color: var(--ink-0); font-variant-numeric: tabular-nums; }
+        .shot-legend-dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--accent); }
+        .shot-legend-dot.secondary { background: var(--accent-2); }
+        .shot-legend-dot.muted { background: rgba(255,255,255,0.34); }
+
+        /* Match profile: a true multi-axis comparison, rendered as SVG so it
+           remains sharp in OBS at any browser-source resolution. */
+        .radar-layout { display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(100%, 600px); margin: 0 auto; }
+        .radar-legend { display: flex; align-items: center; justify-content: center; gap: 32px; color: var(--ink-2); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+        .radar-legend span { display: inline-flex; align-items: center; gap: 9px; }
+        .radar-swatch { width: 34px; height: 4px; border-radius: 3px; background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+        .radar-swatch.away { background: var(--accent-2); box-shadow: none; }
+        .match-radar { width: 100%; height: auto; overflow: visible; }
+        .radar-grid { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+        .radar-axis { stroke: rgba(255,255,255,0.10); stroke-width: 1; }
+        .radar-home { fill: rgba(124,106,255,0.22); stroke: var(--accent); stroke-width: 3; stroke-linejoin: round; }
+        .radar-away { fill: rgba(79,215,255,0.12); stroke: var(--accent-2); stroke-width: 3; stroke-linejoin: round; }
+        .radar-dot-home { fill: var(--accent); }
+        .radar-dot-away { fill: var(--accent-2); }
+        .radar-label { fill: var(--ink-2); font-family: Inter, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+
+        /* ── Lineup pitch ── */
+        .lineup-layout { display: grid; grid-template-columns: minmax(620px, 1fr) minmax(220px, 290px); gap: clamp(22px, 3vw, 46px); align-items: stretch; }
+        .lineup-pitch { position: relative; min-height: 470px; overflow: hidden; border: 1px solid rgba(255,255,255,0.18); border-radius: 26px; background: linear-gradient(90deg, rgba(255,255,255,0.025) 50%, transparent 50%), linear-gradient(180deg, rgba(42,116,92,0.42), rgba(22,72,61,0.42)); background-size: 16.66% 100%, 100% 100%; box-shadow: inset 0 0 80px rgba(0,0,0,0.22); }
+        .lineup-pitch::before { content: ''; position: absolute; inset: 5%; border: 2px solid rgba(255,255,255,0.24); border-radius: 4px; background: linear-gradient(90deg, transparent 49.8%, rgba(255,255,255,0.22) 49.8%, rgba(255,255,255,0.22) 50.2%, transparent 50.2%); }
+        .lineup-pitch::after { content: ''; position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; border: 2px solid rgba(255,255,255,0.22); border-radius: 50%; transform: translate(-50%,-50%); }
+        .pitch-box { position: absolute; left: 34%; width: 32%; height: 16%; border: 2px solid rgba(255,255,255,0.22); z-index: 0; }
+        .pitch-box.top { top: 5%; border-top: 0; }
+        .pitch-box.bottom { bottom: 5%; border-bottom: 0; }
+        .lineup-player { position: absolute; z-index: 2; width: 118px; transform: translate(-50%,-50%); text-align: center; animation: player-enter 260ms cubic-bezier(0.23,1,0.32,1) both; }
+        @keyframes player-enter { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } }
+        .lineup-shirt { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 2px solid rgba(255,255,255,0.78); border-radius: 50%; background: var(--accent); color: #fff; font-family: var(--font-display); font-size: 16px; font-weight: 700; box-shadow: 0 7px 20px rgba(0,0,0,0.34); }
+        .lineup-player-name { display: block; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 7px; border-radius: 7px; background: rgba(5,7,13,0.78); color: #fff; font-size: 11px; font-weight: 700; }
+        .lineup-side { display: flex; flex-direction: column; gap: 18px; }
+        .lineup-meta { padding: 20px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); }
+        .lineup-team-name { font-family: var(--font-display); font-size: clamp(25px, 2.6vw, 40px); font-weight: 700; color: var(--ink-0); text-transform: uppercase; }
+        .lineup-formation { margin-top: 8px; font-family: var(--font-display); font-size: clamp(32px, 3.2vw, 50px); font-weight: 700; color: var(--accent); }
+        .lineup-coach { margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+        .bench-title { font-size: 10px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-3); }
+        .bench-list { display: grid; gap: 7px; margin-top: 10px; }
+        .bench-player { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: center; min-width: 0; color: var(--ink-1); font-size: 12px; font-weight: 600; }
+        .bench-player b { color: var(--accent); font-variant-numeric: tabular-nums; }
+        .bench-player span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* ── Match timeline ── */
+        .match-timeline { position: relative; display: grid; gap: 8px; max-width: 1050px; width: 100%; margin: 0 auto; }
+        .match-timeline::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: linear-gradient(transparent, var(--line-2) 8%, var(--line-2) 92%, transparent); }
+        .timeline-scroll { width: 100%; height: clamp(360px, 56vh, 560px); overflow: hidden; mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%); }
+        .timeline-track { padding: 22px 0; will-change: transform; }
+        .timeline-row { position: relative; display: grid; grid-template-columns: 1fr 74px 1fr; align-items: center; min-height: 48px; }
+        .timeline-minute { z-index: 1; justify-self: center; display: flex; align-items: center; justify-content: center; width: 52px; height: 34px; border: 1px solid var(--line-2); border-radius: 999px; background: #0a0c15; color: var(--ink-0); font-family: var(--font-display); font-size: 14px; font-weight: 700; }
+        .timeline-event { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--panel); }
+        .timeline-event.home { grid-column: 1; justify-self: end; flex-direction: row-reverse; text-align: right; }
+        .timeline-event.away { grid-column: 3; }
+        .timeline-icon { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; border-radius: 9px; background: rgba(124,106,255,0.16); color: var(--accent); font-size: 12px; font-weight: 900; }
+        .timeline-event-text { min-width: 0; }
+        .timeline-event-text b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-0); font-size: 13px; }
+        .timeline-event-text span { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 11px; }
+
+        /* ── Goal summary ── */
+        .goal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(16px, 2vw, 28px); }
+        .goal-card { position: relative; overflow: hidden; min-height: 190px; padding: 25px; border: 1px solid var(--line); border-radius: 22px; background: linear-gradient(145deg, rgba(124,106,255,0.14), var(--panel) 55%); }
+        .goal-card::after { content: 'GOAL'; position: absolute; right: -8px; bottom: -17px; font-family: var(--font-display); font-size: 64px; font-weight: 700; color: rgba(255,255,255,0.035); }
+        .goal-minute { font-family: var(--font-display); font-size: 21px; font-weight: 700; color: var(--accent); }
+        .goal-player { position: relative; z-index: 1; margin-top: 20px; font-family: var(--font-display); font-size: clamp(24px, 2.6vw, 40px); font-weight: 700; color: var(--ink-0); line-height: 1.05; }
+        .goal-assist { position: relative; z-index: 1; margin-top: 12px; color: var(--ink-2); font-size: 13px; }
+        .goal-team { position: relative; z-index: 1; margin-top: 6px; color: var(--ink-3); font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+        .paged-view { min-height: 0; }
+        .paged-panel[hidden] { display: none; }
+        .page-counter { margin-top: 14px; text-align: center; color: var(--ink-3); font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+        @media (prefers-reduced-motion: reduce) {
+            .timeline-track { will-change: auto; }
+        }
+
+        /* ── Top performers ── */
+        .performer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(18px, 2.4vw, 34px); align-items: end; }
+        .performer-card { position: relative; min-height: 330px; padding: 28px; border: 1px solid var(--line); border-radius: 24px; background: var(--panel); }
+        .performer-card.rank-1 { min-height: 370px; border-color: rgba(124,106,255,0.42); background: linear-gradient(160deg, rgba(124,106,255,0.18), var(--panel) 60%); }
+        .performer-rank { color: var(--ink-3); font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: 0.16em; }
+        .performer-rating { position: absolute; top: 22px; right: 22px; display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; border: 5px solid var(--accent); color: var(--ink-0); font-family: var(--font-display); font-size: 22px; font-weight: 700; box-shadow: 0 0 22px var(--accent-glow); }
+        .performer-name { max-width: calc(100% - 70px); margin-top: 48px; font-family: var(--font-display); font-size: clamp(27px, 3vw, 46px); font-weight: 700; line-height: 1; color: var(--ink-0); }
+        .performer-team { margin-top: 10px; color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+        .performer-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+        .performer-stat { padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-2); font-size: 11px; font-weight: 600; }
+        .performer-stat b { margin-right: 4px; color: var(--ink-0); font-size: 14px; }
+        @media (prefers-reduced-motion: reduce) {
+            .compare-fill, .possession-home, .possession-away, .shot-segment, .lineup-player { animation: none; }
+        }
+
         /* ── Slide: message (full-screen type) ── */
         .msg-hero {
             font-family: var(--font-display);
@@ -610,6 +848,57 @@
                 </div>
             </section>
 
+            <!-- 3b. Stats (live match statistics, API-Football) -->
+            <section class="slide" data-slide="stats">
+                <div class="stats-board" id="statsBoard">
+                    <div class="stats-empty" id="statsEmpty">Spielstatistik</div>
+                </div>
+            </section>
+
+            <!-- 3c. Shot profile (same API response, no extra request) -->
+            <section class="slide" data-slide="stats_shots">
+                <div class="insight-board" id="shotsBoard">
+                    <div class="stats-empty">Schussbild</div>
+                </div>
+            </section>
+
+            <!-- 3e. Comparative radar profile -->
+            <section class="slide" data-slide="stats_radar">
+                <div class="insight-board" id="radarBoard">
+                    <div class="stats-empty">Matchprofil</div>
+                </div>
+            </section>
+
+            <!-- 3f. Control + discipline (derived from the same snapshot) -->
+            <section class="slide" data-slide="stats_control">
+                <div class="insight-board" id="controlBoard">
+                    <div class="stats-empty">Spielkontrolle</div>
+                </div>
+            </section>
+
+            <!-- 3g/h. Starting XI pitches, one team per readable screen -->
+            <section class="slide" data-slide="lineup_home">
+                <div class="insight-board" id="lineupHomeBoard"><div class="stats-empty">Startelf Heim</div></div>
+            </section>
+            <section class="slide" data-slide="lineup_away">
+                <div class="insight-board" id="lineupAwayBoard"><div class="stats-empty">Startelf Auswärts</div></div>
+            </section>
+
+            <!-- 3i. Chronological match events -->
+            <section class="slide" data-slide="timeline">
+                <div class="insight-board" id="timelineBoard"><div class="stats-empty">Match Timeline</div></div>
+            </section>
+
+            <!-- 3j. Goal summary -->
+            <section class="slide" data-slide="goals">
+                <div class="insight-board" id="goalsBoard"><div class="stats-empty">Tore</div></div>
+            </section>
+
+            <!-- 3k. Top three player performances -->
+            <section class="slide" data-slide="performers">
+                <div class="insight-board" id="performersBoard"><div class="stats-empty">Top 3</div></div>
+            </section>
+
             <!-- 4. Message -->
             <section class="slide" data-slide="message">
                 <div class="msg-eyebrow">Durchsage</div>
@@ -813,6 +1102,13 @@
             try { renderWeather(s.weather); } catch (_) { /* never let a
                 stale cache or missing markup kill the rotation */ }
 
+            // Live match statistics slide (API-Football snapshot).
+            // Reads the normalised, non-secret snapshot only; null/partial
+            // stats are omitted so the grid never shows empty placeholders.
+            try { renderStats(s.liveMatch && s.liveMatch.snapshot, s); } catch (e) { console.error('renderStats crash:', e && e.message ? e.message : e); }
+            try { renderMatchInsights(s.liveMatch && s.liveMatch.snapshot, s); } catch (e) { console.error('renderMatchInsights crash:', e && e.message ? e.message : e); }
+            try { renderRichMatchInsights(s.liveMatch && s.liveMatch.snapshot, s); } catch (e) { console.error('renderRichMatchInsights crash:', e && e.message ? e.message : e); }
+
             // Stash latest state for slide-lifecycle code
             lastState = s;
 
@@ -896,6 +1192,487 @@
         }
         function stopAdCycle() { if (adTimer) { clearInterval(adTimer); adTimer = null; } }
 
+        // ── Live match statistics slide (API-Football) ────────────
+        // Renders the normalised, non-secret snapshot. Omit any stat
+        // whose value is null on BOTH sides; lead-side gets the accent.
+        // `s` is the full break-state so we can fall back to the manual
+        // score/team names when the snapshot is missing or partial.
+        const STAT_DEFS = [
+            { key: 'possession',     label: 'Ballbesitz',   pct: true },
+            { key: 'shotsOnTarget',  label: 'Torschüsse' },
+            { key: 'shotsTotal',     label: 'Schüsse' },
+            { key: 'corners',        label: 'Ecken' },
+            { key: 'fouls',          label: 'Fouls' },
+            { key: 'yellowCards',    label: 'Gelb',  card: 'y' },
+            { key: 'redCards',       label: 'Rot',   card: 'r' },
+        ];
+
+        function statAvailable(st, key) {
+            return st && st[key] && (st[key].home != null || st[key].away != null);
+        }
+        function escapeText(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+        function renderStats(snap, fullState) {
+            const board = $('#statsBoard');
+            if (!board) return;
+            const stats = (snap && snap.stats) || {};
+            const visible = STAT_DEFS.filter(d => statAvailable(stats, d.key));
+
+            // No snapshot at all (no fixture selected / never synced /
+            // feature off): show a neutral placeholder, never an error.
+            if (!snap) {
+                board.innerHTML = '<div class="stats-empty">Spielstatistik</div>';
+                return;
+            }
+
+            const homeName = (snap.home && snap.home.name) || (fullState && fullState.home && fullState.home.name) || 'Heim';
+            const awayName = (snap.away && snap.away.name) || (fullState && fullState.away && fullState.away.name) || 'Gast';
+            const homeScore = (snap.home && Number.isFinite(+snap.home.score)) ? snap.home.score : (fullState && fullState.home && fullState.home.score) || 0;
+            const awayScore = (snap.away && Number.isFinite(+snap.away.score)) ? snap.away.score : (fullState && fullState.away && fullState.away.score) || 0;
+            const status = snap.status || {};
+            const clock = snap.clock || {};
+
+            // Status pill: live dot while in play, warm tone when finished.
+            const statusText = (clock && clock.display) || status.label || '—';
+            const finished = !!status.finished;
+            const statusHtml = '<div class="stats-status' + (finished ? ' finished' : '') + '">' +
+                '<span class="live-dot"></span>' + escapeText(statusText) + '</div>';
+
+            // Scoreline header
+            const headHtml =
+                '<div class="stats-head">' +
+                '<div class="stats-eyebrow">Spielstatistik</div>' +
+                statusHtml +
+                '<div class="stats-row">' +
+                '<div class="stats-team"><span class="nm">' + escapeText(homeName) + '</span><span class="gl">' + homeScore + '</span></div>' +
+                '<span class="stats-vs">:</span>' +
+                '<div class="stats-team"><span class="nm">' + escapeText(awayName) + '</span><span class="gl">' + awayScore + '</span></div>' +
+                '</div></div>';
+
+            // Statistics grid — bars for percentages, plain rows otherwise.
+            const rows = visible.map(d => {
+                const v = stats[d.key];
+                const h = v.home != null ? v.home : 0;
+                const a = v.away != null ? v.away : 0;
+                const homeLead = (v.home != null) && (v.away == null || v.home > v.away);
+                const awayLead = (v.away != null) && (v.home == null || v.away > v.home);
+                if (d.pct) {
+                    // Possession / pass accuracy: proportional split bar.
+                    const total = (h + a) || 1;
+                    const hp = Math.round((h / total) * 100);
+                    const ap = 100 - hp;
+                    return '<div class="stat-line" style="grid-template-rows:auto auto;gap:6px">' +
+                        '<span class="sv home' + (homeLead ? ' lead' : '') + '">' + (v.home != null ? h + '%' : '—') + '</span>' +
+                        '<span class="sl-label">' + d.label + '</span>' +
+                        '<span class="sv away' + (awayLead ? ' lead' : '') + '">' + (v.away != null ? a + '%' : '—') + '</span>' +
+                        '<span class="sb-track" style="grid-column:1/-1">' +
+                        '<span class="sb-fill-home" style="width:' + hp + '%"></span>' +
+                        '<span class="sb-fill-away" style="width:' + ap + '%"></span>' +
+                        '</span></div>';
+                }
+                const cardIcon = d.card === 'y' ? '🟨 ' : d.card === 'r' ? '🟥 ' : '';
+                return '<div class="stat-line">' +
+                    '<span class="sv home' + (homeLead ? ' lead' : '') + '">' + (v.home != null ? h : '—') + '</span>' +
+                    '<span class="sl-label">' + cardIcon + d.label + '</span>' +
+                    '<span class="sv away' + (awayLead ? ' lead' : '') + '">' + (v.away != null ? a : '—') + '</span>' +
+                    '</div>';
+            }).join('');
+
+            const gridHtml = visible.length
+                ? '<div class="stats-grid">' + rows + '</div>'
+                : '<div class="stats-empty">Keine Statistik verfügbar</div>';
+
+            board.innerHTML = headHtml + gridHtml;
+        }
+
+        // Focused visual stories from the already-cached snapshot.
+        // These are pure presentation: they never trigger provider calls.
+        const SHOT_DEFS = [
+            { key: 'shotsOnTarget', label: 'Auf das Tor' },
+            { key: 'shotsOffTarget', label: 'Neben das Tor' },
+            { key: 'shotsBlocked', label: 'Geblockt' },
+            { key: 'shotsInsideBox', label: 'Im Strafraum' },
+            { key: 'shotsOutsideBox', label: 'Außerhalb' },
+        ];
+
+        function insightContext(snap, fullState) {
+            return {
+                home: (snap && snap.home && snap.home.name) || (fullState && fullState.home && fullState.home.name) || 'Heim',
+                away: (snap && snap.away && snap.away.name) || (fullState && fullState.away && fullState.away.name) || 'Gast',
+                stats: (snap && snap.stats) || {},
+            };
+        }
+        function insightHead(ctx, kicker, title) {
+            return '<div class="insight-head">' +
+                '<div class="insight-team"><span class="insight-team-name">' + escapeText(ctx.home) + '</span><span class="insight-team-side">Heim</span></div>' +
+                '<div class="insight-heading"><div class="insight-kicker">' + kicker + '</div><div class="insight-title">' + title + '</div></div>' +
+                '<div class="insight-team away"><span class="insight-team-name">' + escapeText(ctx.away) + '</span><span class="insight-team-side">Auswärts</span></div>' +
+                '</div>';
+        }
+        function displayStat(value, suffix) { return value == null ? '—' : escapeText(value) + (suffix || ''); }
+
+        function renderShotInsight(snap, fullState) {
+            const board = $('#shotsBoard');
+            if (!board) return;
+            if (!snap) { board.innerHTML = '<div class="stats-empty">Schussbild</div>'; return; }
+            const ctx = insightContext(snap, fullState);
+            const hasShots = SHOT_DEFS.some(d => statAvailable(ctx.stats, d.key));
+            if (!hasShots) { board.innerHTML = insightHead(ctx, 'Match Insights', 'Das Schussbild') + '<div class="stats-empty">Keine Schussdaten verfügbar</div>'; return; }
+            board.innerHTML = insightHead(ctx, 'Match Insights', 'Das Schussbild') + '<div class="shot-cards">' +
+                shotCompositionCard(ctx, 'home') + shotCompositionCard(ctx, 'away') + '</div>';
+        }
+
+        function sideValue(stats, key, side) {
+            const value = stats[key] && stats[key][side];
+            return value != null && Number.isFinite(+value) ? +value : null;
+        }
+        function shotLegend(label, value, tone) {
+            if (value == null) return '';
+            return '<span class="shot-legend-item"><i class="shot-legend-dot ' + (tone || '') + '"></i>' + label + ' <b>' + value + '</b></span>';
+        }
+        function segmentedShotGroup(title, items) {
+            const visible = items.filter(item => item.value != null);
+            if (!visible.length) return '';
+            const total = visible.reduce((sum, item) => sum + Math.max(0, item.value), 0) || 1;
+            const segments = visible.map(item => '<span class="shot-segment ' + item.tone + '" style="width:' + (Math.max(0, item.value) / total * 100).toFixed(2) + '%"></span>').join('');
+            const legend = visible.map(item => shotLegend(item.label, item.value, item.tone)).join('');
+            return '<div class="shot-group"><div class="shot-group-title">' + title + '</div><div class="shot-segments">' + segments + '</div><div class="shot-legend">' + legend + '</div></div>';
+        }
+        function shotCompositionCard(ctx, side) {
+            const st = ctx.stats;
+            const on = sideValue(st, 'shotsOnTarget', side);
+            const total = sideValue(st, 'shotsTotal', side);
+            const accuracy = on != null && total > 0 ? Math.round(on / total * 100) : null;
+            const result = segmentedShotGroup('Abschluss', [
+                { label: 'Aufs Tor', value: on, tone: 'primary' },
+                { label: 'Daneben', value: sideValue(st, 'shotsOffTarget', side), tone: 'secondary' },
+                { label: 'Geblockt', value: sideValue(st, 'shotsBlocked', side), tone: 'muted' },
+            ]);
+            const location = segmentedShotGroup('Position', [
+                { label: 'Strafraum', value: sideValue(st, 'shotsInsideBox', side), tone: 'primary' },
+                { label: 'Distanz', value: sideValue(st, 'shotsOutsideBox', side), tone: 'muted' },
+            ]);
+            return '<div class="shot-card"><div class="shot-card-top"><div class="shot-card-heading"><div class="shot-card-name">' + escapeText(ctx[side]) + '</div>' +
+                '<div class="shot-accuracy">Präzision <b>' + (accuracy == null ? '—' : accuracy + '%') + '</b></div></div>' +
+                '<div class="shot-total"><b>' + displayStat(total) + '</b><span>Schüsse</span></div></div>' + result + location + '</div>';
+        }
+
+        const RADAR_DEFS = [
+            { label: 'Ballbesitz', values: st => statPair(st, 'possession') },
+            { label: 'Präzision', values: st => ratioPair(st, 'shotsOnTarget', 'shotsTotal') },
+            { label: 'Strafraum', values: st => ratioPair(st, 'shotsInsideBox', 'shotsTotal') },
+            { label: 'Passquote', values: st => statPair(st, 'passesPct') },
+            { label: 'Druck', values: st => sharePair(st, 'shotsTotal') },
+            { label: 'Ecken', values: st => sharePair(st, 'corners') },
+        ];
+        function statPair(st, key) {
+            const h = sideValue(st, key, 'home'), a = sideValue(st, key, 'away');
+            return h == null || a == null ? null : [h, a];
+        }
+        function ratioPair(st, numerator, denominator) {
+            const hn = sideValue(st, numerator, 'home'), an = sideValue(st, numerator, 'away');
+            const hd = sideValue(st, denominator, 'home'), ad = sideValue(st, denominator, 'away');
+            if (hn == null || an == null || !hd || !ad) return null;
+            return [hn / hd * 100, an / ad * 100];
+        }
+        function sharePair(st, key) {
+            const pair = statPair(st, key);
+            if (!pair || pair[0] + pair[1] <= 0) return null;
+            const total = pair[0] + pair[1];
+            return [pair[0] / total * 100, pair[1] / total * 100];
+        }
+        function radarPoint(index, count, radius, value) {
+            const angle = -Math.PI / 2 + index * Math.PI * 2 / count;
+            const r = radius * Math.max(0, Math.min(100, value)) / 100;
+            return [260 + Math.cos(angle) * r, 260 + Math.sin(angle) * r];
+        }
+        function radarPoints(values, radius) {
+            return values.map((value, i) => radarPoint(i, values.length, radius, value).map(n => n.toFixed(1)).join(',')).join(' ');
+        }
+        function renderRadarInsight(snap, fullState) {
+            const board = $('#radarBoard');
+            if (!board) return;
+            if (!snap) { board.innerHTML = '<div class="stats-empty">Matchprofil</div>'; return; }
+            const ctx = insightContext(snap, fullState);
+            const axes = RADAR_DEFS.map(def => ({ label: def.label, values: def.values(ctx.stats) })).filter(axis => axis.values);
+            if (axes.length < 3) { board.innerHTML = insightHead(ctx, 'Match Insights', 'Matchprofil') + '<div class="stats-empty">Zu wenige Profildaten verfügbar</div>'; return; }
+            const n = axes.length, radius = 178;
+            const grids = [25, 50, 75, 100].map(level => '<polygon class="radar-grid" points="' + radarPoints(Array(n).fill(level), radius) + '"></polygon>').join('');
+            const axisLines = axes.map((axis, i) => { const p = radarPoint(i, n, radius, 100); return '<line class="radar-axis" x1="260" y1="260" x2="' + p[0].toFixed(1) + '" y2="' + p[1].toFixed(1) + '"></line>'; }).join('');
+            const labels = axes.map((axis, i) => { const p = radarPoint(i, n, 222, 100); const anchor = Math.abs(p[0] - 260) < 20 ? 'middle' : (p[0] < 260 ? 'end' : 'start'); return '<text class="radar-label" x="' + p[0].toFixed(1) + '" y="' + (p[1] + 5).toFixed(1) + '" text-anchor="' + anchor + '">' + escapeText(axis.label) + '</text>'; }).join('');
+            const homeValues = axes.map(axis => axis.values[0]), awayValues = axes.map(axis => axis.values[1]);
+            const homePoints = radarPoints(homeValues, radius), awayPoints = radarPoints(awayValues, radius);
+            const dots = homeValues.map((value, i) => { const p = radarPoint(i, n, radius, value); return '<circle class="radar-dot-home" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4"></circle>'; }).join('') + awayValues.map((value, i) => { const p = radarPoint(i, n, radius, value); return '<circle class="radar-dot-away" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="4"></circle>'; }).join('');
+            const svg = '<svg class="match-radar" viewBox="0 0 520 520" role="img" aria-label="Vergleichendes Matchprofil">' + grids + axisLines + '<polygon class="radar-away" points="' + awayPoints + '"></polygon><polygon class="radar-home" points="' + homePoints + '"></polygon>' + dots + labels + '</svg>';
+            board.innerHTML = insightHead(ctx, 'Match Insights', 'Matchprofil') + '<div class="radar-layout">' + svg +
+                '<div class="radar-legend"><span><i class="radar-swatch"></i>Heim</span><span><i class="radar-swatch away"></i>Auswärts</span></div></div>';
+        }
+
+        function metricCard(stats, key, label, marker) {
+            if (!statAvailable(stats, key)) return '';
+            const v = stats[key] || {};
+            return '<div class="metric-card"><div class="metric-card-label">' + (marker || '') + label + '</div>' +
+                '<div class="metric-card-values"><span class="metric-card-value">' + displayStat(v.home) + '</span><span class="metric-card-sep">:</span><span class="metric-card-value">' + displayStat(v.away) + '</span></div></div>';
+        }
+        function passVolumeCard(stats) {
+            if (!statAvailable(stats, 'passes') && !statAvailable(stats, 'passesAccurate')) return '';
+            const total = stats.passes || {};
+            const accurate = stats.passesAccurate || {};
+            const value = side => displayStat(accurate[side]) + ' / ' + displayStat(total[side]);
+            return '<div class="metric-card"><div class="metric-card-label">Angekommen / gesamt</div>' +
+                '<div class="metric-card-values"><span class="metric-card-value">' + value('home') + '</span><span class="metric-card-sep">:</span><span class="metric-card-value">' + value('away') + '</span></div></div>';
+        }
+        function renderControlInsight(snap, fullState) {
+            const board = $('#controlBoard');
+            if (!board) return;
+            if (!snap) { board.innerHTML = '<div class="stats-empty">Spielkontrolle</div>'; return; }
+            const ctx = insightContext(snap, fullState);
+            const st = ctx.stats;
+            const possessionValues = st.possession || {};
+            const hasPossession = Number.isFinite(+possessionValues.home) && Number.isFinite(+possessionValues.away);
+            const cards = [
+                passVolumeCard(st),
+                metricCard(st, 'passesPct', 'Passquote'),
+                metricCard(st, 'fouls', 'Fouls'),
+                metricCard(st, 'offsides', 'Abseits'),
+                metricCard(st, 'yellowCards', 'Gelbe Karten', '<span class="card-mark yellow"></span>'),
+                metricCard(st, 'redCards', 'Rote Karten', '<span class="card-mark red"></span>'),
+            ].filter(Boolean).join('');
+            if (!hasPossession && !cards) { board.innerHTML = insightHead(ctx, 'Match Insights', 'Spielkontrolle') + '<div class="stats-empty">Keine Kontrolldaten verfügbar</div>'; return; }
+            let possession = '';
+            if (hasPossession) {
+                const v = possessionValues;
+                const h = +v.home;
+                const a = +v.away;
+                const total = h + a || 1;
+                const hp = Math.max(0, Math.min(100, Math.round(h / total * 100)));
+                possession = '<div class="possession-hero"><div class="possession-values">' +
+                    '<span class="possession-value">' + displayStat(v.home, '%') + '</span><span class="possession-label">Ballbesitz</span><span class="possession-value away">' + displayStat(v.away, '%') + '</span></div>' +
+                    '<div class="possession-track"><div class="possession-home" style="width:' + hp + '%"></div><div class="possession-away" style="width:' + (100 - hp) + '%"></div></div></div>';
+            }
+            board.innerHTML = insightHead(ctx, 'Match Insights', 'Kontrolle & Disziplin') + possession + (cards ? '<div class="metric-cards">' + cards + '</div>' : '');
+        }
+        function renderMatchInsights(snap, fullState) {
+            renderShotInsight(snap, fullState);
+            renderRadarInsight(snap, fullState);
+            renderControlInsight(snap, fullState);
+        }
+
+        // ── Rich fixture insights: lineups, events, goals, players ──
+        function matchTeamName(snap, fullState, side) {
+            return (snap && snap[side] && snap[side].name) || (fullState && fullState[side] && fullState[side].name) || (side === 'home' ? 'Heim' : 'Gast');
+        }
+        function minuteText(event) {
+            if (!event || event.minute == null) return '—';
+            return event.minute + (event.extra ? '+' + event.extra : '') + "'";
+        }
+        function lineupPlayerPositions(players) {
+            const rows = {};
+            players.forEach((player, index) => {
+                const parts = String(player.grid || '').split(':').map(Number);
+                const x = Number.isFinite(parts[0]) && parts[0] > 0 ? parts[0] : Math.min(5, Math.floor(index / 3) + 1);
+                const y = Number.isFinite(parts[1]) && parts[1] > 0 ? parts[1] : ((index % 3) + 1);
+                if (!rows[x]) rows[x] = [];
+                rows[x].push({ player, x, y, index });
+            });
+            const lines = Object.keys(rows).map(Number).sort((a, b) => a - b);
+            const maxLine = Math.max(2, ...lines);
+            return players.map((player, index) => {
+                let found;
+                for (const line of lines) found = found || rows[line].find(item => item.index === index);
+                const lineItems = found ? rows[found.x].sort((a, b) => a.y - b.y) : [];
+                const column = Math.max(0, lineItems.findIndex(item => item.index === index));
+                return {
+                    player,
+                    left: ((column + 1) / (lineItems.length + 1) * 100),
+                    top: 90 - ((found ? found.x : 1) - 1) / (maxLine - 1) * 80,
+                };
+            });
+        }
+        function renderLineupBoard(snap, fullState, side) {
+            const board = $(side === 'home' ? '#lineupHomeBoard' : '#lineupAwayBoard');
+            if (!board) return;
+            const lineup = snap && snap.lineups && snap.lineups[side];
+            if (!lineup || !Array.isArray(lineup.startXI) || !lineup.startXI.length) {
+                board.innerHTML = '<div class="stats-empty">Startelf noch nicht verfügbar</div>';
+                return;
+            }
+            const team = matchTeamName(snap, fullState, side);
+            const players = lineupPlayerPositions(lineup.startXI).map((item, i) =>
+                '<div class="lineup-player" style="left:' + item.left.toFixed(2) + '%;top:' + item.top.toFixed(2) + '%;animation-delay:' + (i * 22) + 'ms">' +
+                '<span class="lineup-shirt">' + (item.player.number != null ? item.player.number : '·') + '</span>' +
+                '<span class="lineup-player-name">' + escapeText(item.player.name) + '</span></div>'
+            ).join('');
+            const bench = (Array.isArray(lineup.substitutes) ? lineup.substitutes : []).slice(0, 9).map(player =>
+                '<div class="bench-player"><b>' + (player.number != null ? player.number : '·') + '</b><span>' + escapeText(player.name) + '</span></div>'
+            ).join('');
+            board.innerHTML = '<div class="insight-heading"><div class="insight-kicker">Starting XI</div><div class="insight-title">' + escapeText(team) + '</div></div>' +
+                '<div class="lineup-layout"><div class="lineup-pitch"><div class="pitch-box top"></div><div class="pitch-box bottom"></div>' + players + '</div>' +
+                '<aside class="lineup-side"><div class="lineup-meta"><div class="lineup-team-name">' + escapeText(team) + '</div><div class="lineup-formation">' + escapeText(lineup.formation || '—') + '</div>' +
+                (lineup.coach ? '<div class="lineup-coach">Coach · ' + escapeText(lineup.coach) + '</div>' : '') + '</div>' +
+                (bench ? '<div class="lineup-meta"><div class="bench-title">Bank</div><div class="bench-list">' + bench + '</div></div>' : '') + '</aside></div>';
+        }
+
+        function eventKind(event) {
+            const type = String(event.type || '').toLowerCase();
+            const detail = String(event.detail || '').toLowerCase();
+            if (type === 'goal') return { icon: '●', title: detail.includes('missed') ? 'Elfmeter vergeben' : 'Tor' };
+            if (type === 'card') return { icon: detail.includes('red') ? 'R' : 'Y', title: detail.includes('red') ? 'Rote Karte' : 'Gelbe Karte' };
+            if (type === 'subst') return { icon: '↕', title: 'Wechsel' };
+            if (type === 'var') return { icon: 'V', title: 'VAR' };
+            return { icon: '·', title: event.type || 'Ereignis' };
+        }
+        function eventDescription(event) {
+            const type = String(event.type || '').toLowerCase();
+            if (type === 'subst') return (event.assist ? escapeText(event.assist) + ' rein' : '') + (event.player ? ' · ' + escapeText(event.player) + ' raus' : '');
+            if (type === 'goal' && event.assist) return escapeText(event.player || '—') + ' · Assist ' + escapeText(event.assist);
+            return escapeText(event.player || event.detail || '—');
+        }
+        const pageIndexes = { goals: 0 };
+        const pageTimers = { goals: null };
+        let timelineAnimation = null;
+        let timelineFrame = null;
+        function chunkItems(items, size) {
+            const pages = [];
+            for (let i = 0; i < items.length; i += size) pages.push(items.slice(i, i + size));
+            return pages;
+        }
+        function showPagedPanel(kind) {
+            const view = document.querySelector('.paged-view[data-page-kind="' + kind + '"]');
+            if (!view) return;
+            const panels = Array.from(view.querySelectorAll('.paged-panel'));
+            if (!panels.length) return;
+            pageIndexes[kind] = pageIndexes[kind] % panels.length;
+            panels.forEach((panel, index) => { panel.hidden = index !== pageIndexes[kind]; });
+            const counter = view.parentElement && view.parentElement.querySelector('.page-counter');
+            if (counter) {
+                counter.textContent = panels.length > 1 ? 'Seite ' + (pageIndexes[kind] + 1) + ' / ' + panels.length : '';
+                counter.hidden = panels.length < 2;
+            }
+        }
+        function stopPageCycle(kind) {
+            if (pageTimers[kind]) clearInterval(pageTimers[kind]);
+            pageTimers[kind] = null;
+        }
+        function startPageCycle(kind) {
+            stopPageCycle(kind);
+            showPagedPanel(kind);
+            const panels = document.querySelectorAll('.paged-view[data-page-kind="' + kind + '"] .paged-panel');
+            if (panels.length < 2) return;
+            pageTimers[kind] = setInterval(() => {
+                pageIndexes[kind] = (pageIndexes[kind] + 1) % panels.length;
+                showPagedPanel(kind);
+            }, 3800);
+        }
+        function prepareTimelineScroll() {
+            if (timelineFrame) cancelAnimationFrame(timelineFrame);
+            if (timelineAnimation) timelineAnimation.cancel();
+            timelineAnimation = null;
+            timelineFrame = requestAnimationFrame(() => {
+                timelineFrame = null;
+                const viewport = document.querySelector('.timeline-scroll');
+                const track = viewport && viewport.querySelector('.timeline-track');
+                if (!viewport || !track) return;
+                const overflow = Math.max(0, track.scrollHeight - viewport.clientHeight);
+                track.style.transform = overflow > 2 ? 'translateY(-' + overflow + 'px)' : '';
+                if (overflow <= 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+                const pauseMs = 2200;
+                const travelMs = Math.max(6500, overflow / 24 * 1000);
+                const duration = pauseMs * 2 + travelMs * 2;
+                timelineAnimation = track.animate([
+                    { transform: 'translateY(-' + overflow + 'px)', offset: 0 },
+                    { transform: 'translateY(-' + overflow + 'px)', offset: pauseMs / duration },
+                    { transform: 'translateY(0)', offset: (pauseMs + travelMs) / duration },
+                    { transform: 'translateY(0)', offset: (pauseMs * 2 + travelMs) / duration },
+                    { transform: 'translateY(-' + overflow + 'px)', offset: 1 },
+                ], { duration, iterations: Infinity, easing: 'linear', fill: 'both' });
+                if (activeSlide !== 'timeline') timelineAnimation.pause();
+            });
+        }
+        function startTimelineScroll() {
+            if (timelineAnimation) timelineAnimation.play();
+            else prepareTimelineScroll();
+        }
+        function stopTimelineScroll() {
+            if (timelineAnimation) timelineAnimation.pause();
+        }
+        function clearTimelineScroll() {
+            if (timelineFrame) cancelAnimationFrame(timelineFrame);
+            timelineFrame = null;
+            if (timelineAnimation) timelineAnimation.cancel();
+            timelineAnimation = null;
+        }
+        function timelineEvents(events) {
+            return events
+                .filter(e => ['goal', 'card', 'subst', 'var'].includes(String(e.type || '').toLowerCase()))
+                .sort((a, b) => (a.minute || 0) - (b.minute || 0) || (a.extra || 0) - (b.extra || 0));
+        }
+        function renderTimeline(snap) {
+            const board = $('#timelineBoard');
+            if (!board) return;
+            const events = timelineEvents(Array.isArray(snap && snap.events) ? snap.events : []);
+            if (!events.length) { clearTimelineScroll(); board.innerHTML = '<div class="stats-empty">Noch keine Match-Ereignisse</div>'; return; }
+            const rows = events.map(event => {
+                const kind = eventKind(event);
+                const card = '<div class="timeline-event ' + event.side + '"><span class="timeline-icon">' + kind.icon + '</span><div class="timeline-event-text"><b>' + escapeText(kind.title) + '</b><span>' + eventDescription(event) + '</span></div></div>';
+                return '<div class="timeline-row">' + (event.side === 'home' ? card : '<span></span>') + '<div class="timeline-minute">' + minuteText(event) + '</div>' + (event.side === 'away' ? card : '') + '</div>';
+            }).join('');
+            board.innerHTML = '<div class="insight-heading"><div class="insight-kicker">Match Story</div><div class="insight-title">Timeline</div></div>' +
+                '<div class="timeline-scroll"><div class="timeline-track"><div class="match-timeline">' + rows + '</div></div></div>';
+            prepareTimelineScroll();
+        }
+
+        function renderGoals(snap, fullState) {
+            const board = $('#goalsBoard');
+            if (!board) return;
+            const goals = (Array.isArray(snap && snap.events) ? snap.events : []).filter(e => String(e.type || '').toLowerCase() === 'goal' && !String(e.detail || '').toLowerCase().includes('missed'));
+            if (!goals.length) { stopPageCycle('goals'); board.innerHTML = '<div class="stats-empty">Noch keine Tore</div>'; return; }
+            const pages = chunkItems(goals, 6).map(page => '<div class="paged-panel"><div class="goal-grid">' + page.map(goal => {
+                    const team = matchTeamName(snap, fullState, goal.side);
+                    const detail = String(goal.detail || '').toLowerCase();
+                    const note = detail.includes('penalty') ? 'Elfmeter' : detail.includes('own') ? 'Eigentor' : '';
+                    return '<div class="goal-card"><div class="goal-minute">' + minuteText(goal) + '</div><div class="goal-player">' + escapeText(goal.player || '—') + '</div>' +
+                        (goal.assist ? '<div class="goal-assist">Assist · ' + escapeText(goal.assist) + '</div>' : note ? '<div class="goal-assist">' + note + '</div>' : '') +
+                        '<div class="goal-team">' + escapeText(team) + '</div></div>';
+                }).join('') + '</div></div>').join('');
+            board.innerHTML = '<div class="insight-heading"><div class="insight-kicker">Match Story</div><div class="insight-title">Die Tore</div></div>' +
+                '<div class="paged-view" data-page-kind="goals">' + pages + '</div><div class="page-counter"></div>';
+            showPagedPanel('goals');
+        }
+
+        function performerChips(player) {
+            const defs = [
+                ['goals', 'Tore'], ['assists', 'Assists'], ['shotsOn', 'aufs Tor'], ['keyPasses', 'Key Pässe'],
+                ['tackles', 'Tacklings'], ['interceptions', 'Interceptions'], ['duelsWon', 'Duelle'], ['saves', 'Paraden'],
+            ];
+            const useful = defs.filter(([key]) => player[key] != null && player[key] > 0).slice(0, 4);
+            if (!useful.length && player.minutes != null) useful.push(['minutes', 'Minuten']);
+            return useful.map(([key, label]) => '<span class="performer-stat"><b>' + escapeText(player[key]) + '</b>' + label + '</span>').join('');
+        }
+        function renderPerformers(snap, fullState) {
+            const board = $('#performersBoard');
+            if (!board) return;
+            const players = Array.isArray(snap && snap.topPlayers) ? snap.topPlayers.slice(0, 3) : [];
+            if (!players.length) { board.innerHTML = '<div class="stats-empty">Spielerbewertungen noch nicht verfügbar</div>'; return; }
+            const display = players.length === 3 ? [players[1], players[0], players[2]] : players;
+            const cards = display.map(player => {
+                const rank = players.indexOf(player) + 1;
+                const team = matchTeamName(snap, fullState, player.side);
+                return '<div class="performer-card rank-' + rank + '"><div class="performer-rank">#' + rank + '</div><div class="performer-rating">' + escapeText(player.rating) + '</div>' +
+                    '<div class="performer-name">' + escapeText(player.name) + '</div><div class="performer-team">' + escapeText(team) + (player.position ? ' · ' + escapeText(player.position) : '') + '</div>' +
+                    '<div class="performer-stats">' + performerChips(player) + '</div></div>';
+            }).join('');
+            board.innerHTML = '<div class="insight-heading"><div class="insight-kicker">Player Ratings</div><div class="insight-title">Top 3</div></div><div class="performer-grid">' + cards + '</div>';
+        }
+        function renderRichMatchInsights(snap, fullState) {
+            renderLineupBoard(snap, fullState, 'home');
+            renderLineupBoard(snap, fullState, 'away');
+            renderTimeline(snap);
+            renderGoals(snap, fullState);
+            renderPerformers(snap, fullState);
+        }
+
         // ── Rotation engine ──
         let rotTimer = null;
         let activeList = [];
@@ -962,6 +1739,8 @@
             if (name === 'mercury') startMercury(); else stopMercury();
             if (name === 'nebel') startNebel(); else stopNebel();
             if (name === 'deutsch') startDeutsch(); else stopDeutsch();
+            if (name === 'timeline') startTimelineScroll(); else stopTimelineScroll();
+            if (name === 'goals') startPageCycle('goals'); else stopPageCycle('goals');
         }
 
         // ── Weather (atmospheric slide) ────────────────────────────

@@ -10,6 +10,7 @@ const { createBackend, resolveAutoBackend, NullBackend } = require('./audio/fact
 const config = require('./config');
 const breakState = require('./break-state');
 const weather = require('./weather-state');
+const football = require('./football-state');
 const { PairingManager, isLoopback } = require('./pairing');
 
 // .env is the single source of truth. Loaded once at boot with
@@ -26,6 +27,15 @@ function emitOperators(event, data) {
     for (const socket of io.sockets.sockets.values()) {
         if (socket.data.operator) socket.emit(event, data);
     }
+}
+
+// Seed one freshly-connected operator with the current live-match status
+// (availability, selected fixture, last sync result, quota). The audience
+// break page never receives this — it only ever sees the normalised
+// snapshot that rides along inside breakState.
+function pushFootballStatus(socket) {
+    if (!socket.data.operator) return;
+    try { socket.emit('liveMatchStatus', football.getStatus()); } catch (_) { /* never block the handshake */ }
 }
 
 const serverStartTime = Date.now();
@@ -451,6 +461,12 @@ function reloadRuntime() {
 
     // Weather — restart the poller with (possibly) new stadium coords.
     startWeather();
+
+    // API-Football — re-read the (possibly) new key / league / season
+    // / refresh interval, then push a fresh status so the operator UI
+    // reflects the new enabled/hasKey state without a page refresh.
+    football.configure({ log: line => console.log('[football] ' + line) });
+    emitOperators('liveMatchStatus', football.getStatus());
 }
 
 function lanUrls() {
@@ -484,6 +500,19 @@ function startWeather() {
     });
 }
 startWeather();
+
+// ── API-Football live match data ─────────────────────────────────
+// Isolated server-side client. The key never leaves this process; the
+// operator UI receives only a non-sensitive status object + normalised
+// snapshots. Break activation captures one snapshot; there is no
+// recurring halftime polling, preserving the free daily quota.
+function startFootball() {
+    football.configure({
+        log: line => console.log('[football] ' + line),
+    });
+    football.onStatus(status => emitOperators('liveMatchStatus', status));
+}
+startFootball();
 
 io.on('connection', async socket => {
     const localOperator = isLoopback(socket.handshake.address);
@@ -699,6 +728,10 @@ io.on('connection', async socket => {
     const GAME_DEFAULT = { tv: 0, sp: -60 };
 
     socket.on('GameAction', async () => {
+        // Returning to the live feed: stop break-only API-Football
+        // polling immediately so we don't burn quota while the match
+        // (not the deck) is on the beamer.
+        football.stopBreakPolling();
         try {
             // Save current levels as Break's state before leaving it.
             // Uses snapshotGain (last COMMANDED gain) — a fresh Voicemeeter
@@ -743,6 +776,10 @@ io.on('connection', async socket => {
     });
 
     socket.on('PauseAction', async () => {
+        // Entering a break: capture one fixture snapshot for the deck.
+        // Play is stopped, so no recurring halftime polling is needed.
+        // No-op when no fixture is selected or the feature is disabled.
+        football.startBreakPolling();
         try {
             if (audioBackend.isConnected()) {
                 // Snapshot current levels BEFORE fading, so GameAction
@@ -841,6 +878,48 @@ io.on('connection', async socket => {
         else if (payload.op === 'dwell') breakState.setAdDwell(payload.dwellMs);
         // Legacy single-sponsor patches still work via setAd → items[0]
         else breakState.setAd(payload);
+    });
+
+    // ── API-Football live match controls ──────────────────────
+    // All mutating/sync controls live inside the operator block, so
+    // the paired-operator auth model already gates them. The audience
+    // break page never sends these (and the server ignores them if it
+    // did). Every input is validated; the key never crosses this line.
+    pushFootballStatus(socket);   // seed the operator's status panel
+    socket.on('liveMatchList', async (data) => {
+        const date = data && typeof data.date === 'string' ? data.date : undefined;
+        try {
+            const result = await football.listFixtures(date);
+            socket.emit('liveMatchFixtures', result);
+        } catch (e) {
+            socket.emit('liveMatchFixtures', { date, fixtures: [], error: e && e.reason ? e.reason : 'network' });
+        }
+    });
+    socket.on('liveMatchSelect', (data) => {
+        const id = data && data.fixtureId;
+        const ok = football.selectFixture(id);
+        socket.emit('liveMatchSelectResult', { ok, fixtureId: id });
+        if (ok) io.emit('terminalOutput', 'Live fixture selected: ' + id);
+    });
+    socket.on('liveMatchClear', () => {
+        football.clearSelection();
+        io.emit('terminalOutput', 'Live fixture cleared');
+    });
+    socket.on('liveMatchSync', async (data) => {
+        // Manual Refresh — always pulls fresh statistics (force),
+        // deduped against any in-flight activation sync.
+        const status = await football.sync({ force: true });
+        socket.emit('liveMatchSyncResult', status);
+        io.emit('terminalOutput', status && status.lastError
+            ? ('Live sync failed: ' + status.lastError)
+            : 'Live match synced' + (status && status.remaining != null ? ' (' + status.remaining + ' requests left)' : ''));
+    });
+    socket.on('liveMatchResync', () => {
+        football.resyncFromLive();
+        io.emit('terminalOutput', 'Re-applied live score (manual override cleared)');
+    });
+    socket.on('liveMatchToggle', (data) => {
+        football.setRuntimeEnabled(!!(data && data.enabled));
     });
     socket.on('disconnect', () => {
         console.log('Client disconnected');

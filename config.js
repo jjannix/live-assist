@@ -64,6 +64,15 @@ const SCHEMA = [
       help: 'Decimal degrees. Used by the weather slide to fetch local conditions.' },
     { key: 'STADIUM_LON', label: 'Longitude', type: 'text', default: '7.344',
       help: 'Decimal degrees.' },
+
+    { section: 'Live match data (API-Football)', key: 'API_FOOTBALL_ENABLED', label: 'Enable live match data', type: 'bool', default: 'false',
+      help: 'Master switch. Turn this on after adding a key; turn it off to pause the feature without clearing the key. One snapshot is captured when Break is activated.' },
+    { key: 'API_FOOTBALL_KEY', label: 'API-Football key', type: 'password', sensitive: true, default: '',
+      help: 'Your API-Sports v3 key (https://api-sports.io). Kept only in this file on the server — never sent to browsers or logs. Leave blank to keep the current one.' },
+    { key: 'API_FOOTBALL_LEAGUE', label: 'League ID', type: 'number', default: '1',
+      help: 'API-Sports league id. 1 = FIFA World Cup.' },
+    { key: 'API_FOOTBALL_SEASON', label: 'Season', type: 'number', default: '2026',
+      help: 'Season year for the league above.' },
 ];
 
 /** Load .env once at boot. override:true makes the file authoritative. */

@@ -107,6 +107,48 @@
         }
         .sr-right { flex: 1; display: flex; justify-content: flex-end; }
         .sr-right .chip { padding: 8px 12px; font-size: 12px; }
+
+        /* ── Live match (API-Football) operator panel ── */
+        .lm-banner {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; font-weight: 600; color: var(--text-2);
+            padding: 8px 10px; border-radius: 10px; background: var(--card-up);
+            border: 1px solid var(--border); margin-bottom: 10px;
+        }
+        .lm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
+        .lm-dot.ok   { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .lm-dot.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+        .lm-dot.err  { background: var(--red); }
+        .lm-banner .lm-spacer { flex: 1; }
+        .lm-banner .lm-quota { color: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+        .lm-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .lm-row input[type="date"] {
+            flex: 1; min-height: 44px; padding: 0 12px; border-radius: 12px;
+            background: var(--card-up); border: 1px solid var(--border); color: var(--text);
+            font: 600 13px/1 inherit; color-scheme: dark;
+        }
+        .lm-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+        .lm-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 12px;
+            background: var(--card-up); border: 1px solid var(--border);
+            font-size: 13px; cursor: pointer; transition: all 0.15s;
+        }
+        .lm-item:hover { border-color: var(--border-hl); }
+        .lm-item.sel { border-color: var(--accent); background: rgba(139,92,246,0.10); }
+        .lm-item .lm-match { flex: 1; min-width: 0; }
+        .lm-item .lm-teams { font-weight: 600; color: var(--text); }
+        .lm-item .lm-score { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-2); margin-left: 6px; }
+        .lm-item .lm-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+        .lm-item .lm-check { width: 18px; height: 18px; flex-shrink: 0; color: var(--accent); }
+        .lm-empty { color: var(--text-3); font-size: 12px; font-style: italic; padding: 6px 2px; }
+        .lm-msg { font-size: 12px; color: var(--text-2); padding: 4px 2px; }
+        .lm-msg.err { color: var(--red); }
+        .lm-kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 2px; font-size: 12px; }
+        .lm-kv[hidden] { display: none; }
+        .lm-kv .k { color: var(--text-3); }
+        .lm-kv .v { color: var(--text-2); font-variant-numeric: tabular-nums; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -177,6 +219,44 @@
             <div class="kv">
                 <span class="kv-k">Frozen time</span>
                 <input id="matchVal" type="text" maxlength="12" placeholder="45:00" style="max-width:140px">
+            </div>
+        </div>
+
+        <!-- Live match data (API-Football) -->
+        <div class="section">
+            <div class="section-title">Live match data (API-Football)</div>
+            <div class="lm-banner" id="lmBanner">
+                <span class="lm-dot" id="lmDot"></span>
+                <span id="lmState">Checking…</span>
+                <span class="lm-spacer"></span>
+                <span class="lm-quota" id="lmQuota" hidden></span>
+            </div>
+            <div class="lm-kv" id="lmKvSelected" hidden>
+                <span class="k">Selected fixture</span>
+                <span class="v" id="lmSelected">—</span>
+            </div>
+            <div class="lm-kv" id="lmKvSync" hidden>
+            </div>
+
+            <div class="lm-row">
+                <input id="lmDate" type="date">
+                <button class="chip" id="lmLoad" style="flex:0 0 auto;padding:0 16px">Load</button>
+            </div>
+            <div class="lm-list" id="lmList">
+                <div class="lm-empty">Pick a date and tap „Load” to list fixtures.</div>
+            </div>
+            <div class="lm-msg" id="lmMsg" hidden></div>
+
+            <div class="panel-grid" style="grid-template-columns:1fr 1fr;margin-top:6px">
+                <button class="chip" id="lmSync">↻ Sync now</button>
+                <button class="chip" id="lmResync">↺ Apply live</button>
+            </div>
+            <div class="panel-grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
+                <button class="chip" id="lmClear">Clear selection</button>
+                <button class="chip" id="lmToggle">Live: on</button>
+            </div>
+            <div class="lm-msg" id="lmHint" style="margin-top:8px;color:var(--text-3)">
+                Sync runs automatically once per minute while a break is on screen. Manual edits override live data until „Apply live”.
             </div>
         </div>
 
@@ -300,6 +380,171 @@
         socket.on('breakState', render);
         socket.emit('breakStateGet');
 
+        // ── Live match data (API-Football) ───────────────────────
+        // Read-only status arrives from the server; the mutating calls
+        // below are the operator's. The API key never crosses this line —
+        // we only ever see a boolean hasKey + normalised fixtures/stats.
+        let lmStatus = null;
+        let lmFixtures = [];
+        let lmLoadingList = false;
+
+        // Default the date picker to today (local time) so the operator
+        // can hit „Load” without typing anything on match day.
+        (function initLmDate(){
+            const d = new Date();
+            const s = d.getFullYear() + '-' +
+                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0');
+            $('#lmDate').value = s;
+        })();
+
+        function lmDotClass(st) {
+            if (!st) return '';
+            if (st.lastError === 'auth' || st.lastError === 'rate-limit') return 'err';
+            if (st.lastError) return 'warn';
+            if (st.hasSnapshot) return 'ok';
+            return '';
+        }
+        function lmStateText(st) {
+            if (!st) return 'Checking…';
+            if (!st.hasKey)   return 'No API key — add API_FOOTBALL_KEY in Settings';
+            if (!st.enabled)  return 'Disabled in Settings';
+            if (!st.runtimeEnabled) return 'Live data paused';
+            if (!st.selectedFixtureId) return 'Ready — select a fixture';
+            if (st.lastError === 'auth')        return 'Auth failed — check API key';
+            if (st.lastError === 'rate-limit')  return 'Rate limited (daily quota?)';
+            if (st.lastError === 'plan-access') return 'Plan does not include season ' + (st.season || '');
+            if (st.lastError === 'network')     return 'Network error — showing last data';
+            if (st.lastError === 'timeout')     return 'Request timed out — showing last data';
+            if (st.lastError)                   return 'Error: ' + st.lastError;
+            if (st.hasSnapshot)                 return st.inBreak ? 'Live in break' : 'Synced';
+            return 'Selected — tap „Sync now”';
+        }
+        function lmFormatTime(ms) {
+            if (!ms) return '—';
+            try { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (_) { return '—'; }
+        }
+
+        function renderLmStatus(st) {
+            lmStatus = st || {};
+            $('#lmDot').className = 'lm-dot ' + lmDotClass(st);
+            $('#lmState').textContent = lmStateText(st);
+            const q = $('#lmQuota');
+            if (st && Number.isFinite(st.remaining)) { q.hidden = false; q.textContent = st.remaining + ' req left today'; }
+            else { q.hidden = true; }
+
+            // Selected fixture line
+            const sel = $('#lmKvSelected');
+            if (st && st.selectedFixtureId) {
+                sel.hidden = false;
+                $('#lmSelected').textContent = '#' + st.selectedFixtureId +
+                    (st.manualOverride ? '  (manual override)' : '');
+            } else { sel.hidden = true; }
+
+            // Sync metadata line
+            const syncRow = $('#lmKvSync');
+            if (st && (st.lastUpdated || st.lastAttempt)) {
+                syncRow.hidden = false;
+                const parts = [];
+                if (st.lastUpdated) parts.push('updated ' + lmFormatTime(st.lastUpdated));
+                if (st.lastAttempt && st.lastAttempt !== st.lastUpdated) parts.push('tried ' + lmFormatTime(st.lastAttempt));
+                if (st.source) parts.push(st.source);
+                if (st.polling) parts.push('polling');
+                syncRow.innerHTML = '<span class="k">Sync</span><span class="v">' + escapeHtml(parts.join(' · ')) + '</span>';
+            } else { syncRow.hidden = true; }
+
+            // Toggle button reflects the runtime enabled state
+            const tgl = $('#lmToggle');
+            const on = !!(st && st.runtimeEnabled);
+            tgl.textContent = 'Live: ' + (on ? 'on' : 'off');
+            tgl.classList.toggle('active', on);
+
+            // Re-render the list so the selected item shows its checkmark
+            renderLmList();
+        }
+
+        function renderLmList() {
+            const list = $('#lmList');
+            if (lmLoadingList) {
+                list.innerHTML = '<div class="lm-empty">Loading fixtures…</div>';
+                return;
+            }
+            if (!lmFixtures.length) {
+                list.innerHTML = '<div class="lm-empty">No fixtures loaded for this date.</div>';
+                return;
+            }
+            const selId = lmStatus && lmStatus.selectedFixtureId;
+            list.innerHTML = '';
+            lmFixtures.forEach(f => {
+                const row = document.createElement('div');
+                row.className = 'lm-item' + (f.fixtureId === selId ? ' sel' : '');
+                const score = (f.status === 'NS' || f.status === 'NOT')
+                    ? ''
+                    : ' <span class="lm-score">' + (f.homeScore != null ? f.homeScore : 0) + ':' + (f.awayScore != null ? f.awayScore : 0) + '</span>';
+                row.innerHTML =
+                    '<div class="lm-match">' +
+                    '<div class="lm-teams">' + escapeHtml(f.home || 'Heim') + ' – ' + escapeHtml(f.away || 'Gast') + score + '</div>' +
+                    '<div class="lm-meta">#' + (f.fixtureId || '?') + ' · ' + escapeHtml(f.status || 'NS') + (f.elapsed != null ? ' · ' + f.elapsed + "'" : '') + '</div>' +
+                    '</div>' +
+                    (f.fixtureId === selId ? '<svg class="lm-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '');
+                row.onclick = () => {
+                    socket.emit('liveMatchSelect', { fixtureId: f.fixtureId });
+                    toast('Fixture #' + f.fixtureId + ' selected', 'info', 1200);
+                };
+                list.appendChild(row);
+            });
+        }
+
+        socket.on('liveMatchStatus', renderLmStatus);
+        socket.on('liveMatchFixtures', res => {
+            lmLoadingList = false;
+            if (res && res.error) {
+                lmFixtures = [];
+                const m = $('#lmMsg');
+                m.hidden = false; m.className = 'lm-msg err';
+                m.textContent = res.error === 'plan-access'
+                    ? 'Your API plan does not include season ' + ((lmStatus && lmStatus.season) || '2026') + '.'
+                    : 'Could not load fixtures (' + res.error + ').';
+                renderLmList();
+                return;
+            }
+            lmFixtures = Array.isArray(res && res.fixtures) ? res.fixtures : [];
+            const m = $('#lmMsg');
+            m.hidden = true;
+            renderLmList();
+        });
+        socket.on('liveMatchSelectResult', r => {
+            if (!r || !r.ok) toast('Invalid fixture', 'err', 1600);
+        });
+        socket.on('liveMatchSyncResult', st => {
+            if (st && st.lastError) toast('Sync failed: ' + st.lastError, 'err', 2200);
+            else toast('Synced' + (st && Number.isFinite(st.remaining) ? ' · ' + st.remaining + ' left' : ''), 'info', 1600);
+        });
+
+        $('#lmLoad').onclick = () => {
+            const date = $('#lmDate').value;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('Pick a valid date', 'err', 1400); return; }
+            lmLoadingList = true;
+            renderLmList();
+            socket.emit('liveMatchList', { date });
+        };
+        $('#lmSync').onclick = () => {
+            if (!lmStatus || !lmStatus.selectedFixtureId) { toast('Select a fixture first', 'err', 1400); return; }
+            socket.emit('liveMatchSync', {});
+        };
+        $('#lmResync').onclick = () => {
+            socket.emit('liveMatchResync', {});
+            toast('Applied live data', 'info', 1200);
+        };
+        $('#lmClear').onclick = () => {
+            socket.emit('liveMatchClear', {});
+            toast('Selection cleared', 'info', 1200);
+        };
+        $('#lmToggle').onclick = () => {
+            const on = !!(lmStatus && lmStatus.runtimeEnabled);
+            socket.emit('liveMatchToggle', { enabled: !on });
+        };
+
         const patch = partial => socket.emit('breakUpdate', partial);
 
         $('#tStart').onclick  = () => socket.emit('breakTimer', { action: 'start' });
@@ -324,7 +569,7 @@
         debounce('#title',    v => patch({ title: v }));
         debounce('#message',  v => patch({ message: v }));
 
-        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', message: 'Durchsage', ad: 'Sponsor', weather: 'Wetter', brand: 'Brand', mercury: 'Quecksilber', flowfield: 'Flowfield', nebel: 'Nebel', deutsch: 'Deutschland' };
+        const SLIDE_LABELS = { clock: 'Uhr', radial: 'Ring', score: 'Stand', stats: 'Statistik', stats_shots: 'Schussbild', stats_radar: 'Matchprofil', stats_control: 'Kontrolle', lineup_home: 'Elf Heim', lineup_away: 'Elf Gast', timeline: 'Timeline', goals: 'Tore', performers: 'Top 3', message: 'Durchsage', ad: 'Sponsor', weather: 'Wetter', brand: 'Brand', mercury: 'Quecksilber', flowfield: 'Flowfield', nebel: 'Nebel', deutsch: 'Deutschland' };
         let rotation = {};
         function renderRotation(r) {
             rotation = r || {};
